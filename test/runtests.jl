@@ -1,17 +1,25 @@
 using DrWatson, Test
 @quickactivate "DamBreakSW.jl"
+using TimerOutputs
 
-# Here you include files using `srcdir`
-# include(srcdir("file.jl"))
+include(srcdir("DamBreakSW.jl"))
 
 # Run test suite
 println("Starting tests")
-ti = time()
+to = TimerOutput()
 
 @testset "DamBreakSW.jl tests" begin
-    @test 1 == 1
+  params_1D = DamBreakSW.DamBreak_benchmark_1D_params()
+  @timeit to "Warm-up 1D test" begin
+    @test DamBreakSW.main(params_1D) == nothing
+  end
+  params_1D = DamBreakSW.DamBreak_benchmark_1D_params(
+    nₓ=400,
+    verbose=true
+  )
+  @timeit to "Fine 1D test" begin
+    @test DamBreakSW.main(params_1D) == nothing
+  end
 end
 
-ti = time() - ti
-println("\nTest took total time of:")
-println(round(ti/60, digits = 3), " minutes")
+show(to; compact=true)
