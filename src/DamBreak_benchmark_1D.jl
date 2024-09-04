@@ -104,7 +104,7 @@ function main(params::DamBreak_benchmark_1D_params)
   # Iterate over time
   createpvd(datadir("sims",vtk_folder,"sol")) do pvd
     for (t,(uₕ,hₕ)) in xₕₜ
-      println("Time: $t")
+      println("Time: $t / $T")
       vtk_output && (pvd[t] = createvtk(Ω,datadir("sims",vtk_folder,"sol_$(t).vtu"),cellfields=["u"=>uₕ,"h"=>hₕ]))
     end
   end
