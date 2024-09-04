@@ -1,3 +1,7 @@
+name = "DamBreakSW.jl"
+[compat]
+julia = "1.10.5"
+DrWatson = "2.16.0"
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
