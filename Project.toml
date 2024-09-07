@@ -1,6 +1,7 @@
 name = "DamBreakSW.jl"
 
 [deps]
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DrWatson = "634d3b9d-ee7a-5ddf-bec9-22491ea816e1"
 Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
