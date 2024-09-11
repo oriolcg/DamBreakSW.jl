@@ -37,6 +37,7 @@ function main(params::DamBreak_benchmark_1D_params)
   @unpack L, nₓ, verbose = params
   model = CartesianDiscreteModel((0,L), (nₓ,))
   Ω = Interior(model)
+  Γ = Boundary(model)
 
   # Define boundary conditions
   u₀(x,t) = VectorValue(0.0)
@@ -60,10 +61,15 @@ function main(params::DamBreak_benchmark_1D_params)
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
+  dΓ = Measure(Γ,2*order)
+  measures = (dΩ,dΓ)
+
+  # Normals
+  normals = (get_normal_vector(Γ),)
 
   # Weak form
   @unpack formulation = params
-  res = get_residual_form(dΩ,1,Val(formulation), physics_params)
+  res = get_residual_form(measures,normals,1,Val(formulation), physics_params)
   op = TransientFEOperator(res,X,Y)
 
   # Solver

@@ -35,6 +35,7 @@ function main(params::DamBreak_benchmark_2D_params)
   @unpack mesh_file, verbose = params
   model = GmshDiscreteModel(mesh_file)
   Ω = Interior(model)
+  Γ = Boundary(model,tags="wall")
 
   # Define boundary conditions
   u₀(x,t) = VectorValue(0.0,0.0)
@@ -58,10 +59,16 @@ function main(params::DamBreak_benchmark_2D_params)
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
+  dΓ = Measure(Γ,2*order)
+  measures = (dΩ,dΓ)
+
+  # Normals
+  nΓ = get_normal_vector(Γ)
+  normals = (nΓ,)
 
   # Weak form
   @unpack formulation = params
-  res = get_residual_form(dΩ,2,Val(formulation), physics_params)
+  res = get_residual_form(measures,normals,2,Val(formulation), physics_params)
   op = TransientFEOperator(res,X,Y)
 
   # Solver

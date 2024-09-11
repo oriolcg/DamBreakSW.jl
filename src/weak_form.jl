@@ -21,7 +21,7 @@ end
 
 Get the residual form for the standard Galerkin method.
 """
-function get_residual_form(dΩ,D,::Val{:Galerkin},params::physics_params)
+function get_residual_form(measures,normals,D,::Val{:Galerkin},params::physics_params)
 
   @unpack ν,Cd,g,h₀⬇ = params
   if D==1
@@ -31,20 +31,27 @@ function get_residual_form(dΩ,D,::Val{:Galerkin},params::physics_params)
   end
 
   # Auxiliar functions
-  absᵤ(u) = √(u⋅u + 1.0e-14)
+  absᵤ(u) = √(u⋅u + 1.0e-8)
   convᵤ(a,∇u,v) = (a⋅∇u)⋅v
   strs(∇u,∇v) = ( ν*(∇u+∇u') - 2/3*ν*tr(∇u)*I) ⊙ ∇v
   drag(u,h,v) = Cd/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
   grad(∇h,v) = g*(v⋅∇h)
+  # grad(h,∇v) = -g*h*(tr(∇v))
+  # gradΓ(h,v,n) = g*h*(v⋅n)
   convₕ(u,h,∇u,∇h,w) = ((u⋅∇h) + (h+h₀⬇)*tr(∇u))*w
+  # convₕ(u,h,∇u,∇h,w) = ((h+h₀⬇)*u)⋅∇w
 
   # Residual form
+  dΩ,dΓwall, = measures
+  nwall, = normals
   m(t,(uₜ,hₜ),(v,w)) = ∫(uₜ⋅v + hₜ*w)dΩ
   a(t,(u,h),(v,w)) = ∫( (convᵤ∘(u,∇(u),v)) +
                         (strs∘(∇(u),∇(v))) +
                         (drag∘(u,h,v)) +
+                        # (grad∘(h,∇(v))) +
                         (grad∘(∇(h),v)) +
-                        (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ
+                        (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ# +
+                    #  ∫( (gradΓ∘(h,v,nwall)) )dΓwall
   res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
 
   return res
@@ -57,7 +64,7 @@ end
 
 Get the residual form for the stabilized formulation using Algebraic Subgrid Scales (ASGS).
 """
-function get_residual_form(dΩ,D,::Val{:ASGS},params::physics_params)
+function get_residual_form(measures,normals,D,::Val{:ASGS},params::physics_params)
 
   @unpack ν,Cd,g,h₀⬇ = params
   if D==1
@@ -67,7 +74,7 @@ function get_residual_form(dΩ,D,::Val{:ASGS},params::physics_params)
   end
 
   # Auxiliar functions
-  absᵤ(u) = (u⋅u + 1.0e-14).^(1/2)
+  absᵤ(u) = (u⋅u + 1.0e-8).^(1/2)
   convᵤ(a,∇u,v) = (a⋅∇u)⋅v
   strs(∇u,∇v) = ( ν*(∇u+∇u') - 2/3*ν*tr(∇u)*I) ⊙ ∇v
   drag(u,h,v) = Cd/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
@@ -89,6 +96,8 @@ function get_residual_form(dΩ,D,::Val{:ASGS},params::physics_params)
   Δxₒ = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
 
   # Residual form
+  dΩ,dΓwall, = measures
+  nwall, = normals
   m(t,(uₜ,hₜ),(v,w)) = ∫(uₜ⋅v + hₜ*w)dΩ
   a(t,(u,h),(v,w)) = ∫( (convᵤ∘(u,∇(u),v)) +
                         (strs∘(∇(u),∇(v))) +
@@ -109,7 +118,7 @@ end
 
 Get the residual form for the standard Galerkin method.
 """
-function get_residual_form(dΩ,D,::Val{:Smagorinsky},params::physics_params)
+function get_residual_form(measures,normals,D,::Val{:Smagorinsky},params::physics_params)
 
   @unpack ν,Cd,g,h₀⬇ = params
   if D==1
@@ -120,14 +129,16 @@ function get_residual_form(dΩ,D,::Val{:Smagorinsky},params::physics_params)
 
   # Auxiliar functions
   cₛ = 0.2
-  νₜ(εᵤ,Δx₀) = cₛ*Δx₀^2*(√(2*(εᵤ⊙εᵤ)+1.0e-14))
-  absᵤ(u) = √(u⋅u + 1.0e-14)
+  νₜ(εᵤ,Δx₀) = cₛ*Δx₀^2*(√(2*(εᵤ⊙εᵤ)+1.0e-8 ))
+  absᵤ(u) = √(u⋅u + 1.0e-8)
   convᵤ(a,∇u,v) = (a⋅∇u)⋅v
   strs(∇u,∇v,εᵤ,Δx₀) = ( (ν+νₜ(εᵤ,Δx₀))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,Δx₀))*tr(∇u)*I) ⊙ ∇v
   drag(u,h,v) = Cd/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
   grad(∇h,v) = g*(v⋅∇h)
   convₕ(u,h,∇u,∇h,w) = ((u⋅∇h) + (h+h₀⬇)*tr(∇u))*w
 
+  dΩ,dΓwall, = measures
+  nwall, = normals
   Ω = get_triangulation(dΩ.quad)
   Δx₀ = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
 
