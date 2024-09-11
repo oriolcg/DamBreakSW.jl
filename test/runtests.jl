@@ -1,7 +1,8 @@
-using DrWatson, Test
+using DrWatson
 @quickactivate "DamBreakSW.jl"
 using TimerOutputs
 using DataStructures
+using Test
 
 include(srcdir("DamBreakSW.jl"))
 
