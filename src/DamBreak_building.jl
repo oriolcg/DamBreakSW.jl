@@ -96,3 +96,79 @@ function main(params::DamBreak_building_params)
   return nothing
 
 end
+
+
+
+"""
+    main(ranks,params::DamBreak_building_params)
+
+Main function to run the 2D dambreak problem with an obstacle.
+"""
+function main(ranks,params::DamBreak_building_params)
+
+  # Define the domain and Triangulations
+  @unpack mesh_file, verbose = params
+  model = GmshDiscreteModel(ranks,mesh_file)
+  Ω = Interior(model)
+  Γ = Boundary(model,tags=["walls"])
+
+  # Define boundary conditions
+  u₀(x,t) = VectorValue(0.0,0.0)
+  u₀(t::Real) = x->u₀(x,t)
+
+  # Define initial conditions
+  @unpack x₀, physics_params = params
+  @unpack h₀⬆, h₀⬇ = physics_params
+  h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
+
+  # Define spaces
+  @unpack order, formulation = params
+  X,Y = get_FESpaces(Ω,order,["walls","inlet","sides"],[(true,true),(true,false),(false,true)],[u₀,u₀,u₀],Val(formulation))
+
+  # Integration Measure
+  dΩ = Measure(Ω,2*order)
+  dΓ = Measure(Γ,2*order)
+  measures = (dΩ,dΓ)
+
+  # Normals
+  nΓ = get_normal_vector(Γ)
+  normals = (nΓ,)
+
+  # Weak form
+  @unpack ode_solver_params = params
+  m,a,res = get_forms(measures,normals,2,Val(formulation), physics_params, ode_solver_params)
+  # op = TransientFEOperator(res,X,Y)
+  op = TransientSemilinearFEOperator(m,a,X,Y)
+
+  # Solver
+  # ls = LUSolver()
+  # nls = NLSolver(ls,show_trace=verbose,iterations=10,method=:newton)
+  nls = PETScNonlinearSolver()
+  odes = get_ode_solver(nls,params.ode_solver_params)
+
+  # Initial solution
+  xₕ₀ = interpolate_everywhere([u₀(0),h₀],X)
+  xdotₕ₀ = interpolate_everywhere([VectorValue(0.0,0.0),0.0],X)
+  @unpack vtk_output, vtk_folder = params
+  vtk_output && writevtk(Ω,datadir("sims","test","sol_DB2D_0.vtu"),cellfields=["u"=>xₕ₀[1],"h"=>xₕ₀[2]])
+
+  # Solution
+  xₕₜ = get_solution(odes,op,xₕ₀,xdotₕ₀,params.ode_solver_params)
+
+  # Iterate over time
+  @unpack T = params.ode_solver_params
+  tout = 0.0
+  Δtout = 0.05
+  createpvd(ranks,datadir("sims",vtk_folder,"sol_DB2D")) do pvd
+    for (t,(uₕ,hₕ)) in xₕₜ
+      println("Time: $t / $T")
+      if t >= tout
+        vtk_output && (pvd[t] = createvtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_$(t).vtu"),cellfields=["u"=>uₕ,"h"=>hₕ],order=order))
+        tout += Δtout
+      end
+    end
+  end
+
+  return nothing
+
+end
