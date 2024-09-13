@@ -13,4 +13,4 @@ params_coarse_2D = DamBreakSW.DamBreak_building_params(
   ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0)
   # ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3)
 )
-@timeit to "Coarse" DamBreakSW.main_parallel(1,params_coarse_2D)
+DamBreakSW.main_parallel(1,params_coarse_2D)

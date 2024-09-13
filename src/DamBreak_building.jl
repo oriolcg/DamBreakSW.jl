@@ -48,7 +48,8 @@ function main(params::DamBreak_building_params)
 
   # Define spaces
   @unpack order, formulation = params
-  X,Y = get_FESpaces(Ω,order,["walls","inlet","sides"],[(true,true),(true,false),(false,true)],[u₀,u₀,u₀],Val(formulation))
+  D = 2
+  X,Y = get_FESpaces(Ω,D,order,["walls","inlet","sides"],[(true,true),(true,false),(false,true)],[u₀,u₀,u₀],Val(formulation))
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
@@ -61,7 +62,7 @@ function main(params::DamBreak_building_params)
 
   # Weak form
   @unpack ode_solver_params = params
-  m,a,res = get_forms(measures,normals,2,Val(formulation), physics_params, ode_solver_params)
+  m,a,res = get_forms(measures,normals,D,Val(formulation), physics_params, ode_solver_params)
   # op = TransientFEOperator(res,X,Y)
   op = TransientSemilinearFEOperator(m,a,X,Y)
 
@@ -123,7 +124,8 @@ function main(ranks,params::DamBreak_building_params)
 
   # Define spaces
   @unpack order, formulation = params
-  X,Y = get_FESpaces(Ω,order,["walls","inlet","sides"],[(true,true),(true,false),(false,true)],[u₀,u₀,u₀],Val(formulation))
+  D = 2
+  X,Y = get_FESpaces(Ω,D,order,["walls","inlet","sides"],[(true,true),(true,false),(false,true)],[u₀,u₀,u₀],Val(formulation))
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
@@ -136,9 +138,9 @@ function main(ranks,params::DamBreak_building_params)
 
   # Weak form
   @unpack ode_solver_params = params
-  m,a,res = get_forms(measures,normals,2,Val(formulation), physics_params, ode_solver_params)
+  m,a,res,jac,jac_t = get_forms(measures,normals,D,Val(formulation), physics_params, ode_solver_params)
   # op = TransientFEOperator(res,X,Y)
-  op = TransientSemilinearFEOperator(m,a,X,Y)
+  op = TransientSemilinearFEOperator(m,a,(jac,jac_t),X,Y)
 
   # Solver
   # ls = LUSolver()

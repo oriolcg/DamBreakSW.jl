@@ -16,8 +16,7 @@ The parameters are:
 end
 
 # FE Spaces
-function get_FESpaces(Ω,order::Int,DTags,DMasks,DValues,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})
-  D = num_dims(Ω)
+function get_FESpaces(Ω,D,order::Int,DTags,DMasks,DValues,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})
   refFEᵤ = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   refFEₕ = ReferenceFE(lagrangian,Float64,order-1)
   Vᵤ = TestFESpace(Ω,refFEᵤ,dirichlet_tags=DTags,dirichlet_masks=DMasks)
@@ -29,7 +28,7 @@ function get_FESpaces(Ω,order::Int,DTags,DMasks,DValues,::Union{Val{:Galerkin},
   return X,Y
 end
 
-function get_FESpaces(Ω,order::Int,DTags,DMasks,DValues,::Val{:VectorInvariant})
+function get_FESpaces(Ω,D,order::Int,DTags,DMasks,DValues,::Val{:VectorInvariant})
   refFEᵤ = ReferenceFE(raviart_thomas,Float64,order-1)
   refFEₕ = ReferenceFE(lagrangian,Float64,order-1)
   refFEq = ReferenceFE(lagrangian,Float64,order)
@@ -185,6 +184,69 @@ function get_forms(measures,normals,D,::Val{:Smagorinsky},
   res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
 
   return m,a,res
+
+end
+
+"""
+    get_forms(::Val{:Smagorinsky},params::physics_params)
+
+Get the operator forms for the Smagorinsky method.
+"""
+function get_forms(measures::Tuple{Vararg{GridapDistributed.DistributedMeasure}},normals,D,::Val{:Smagorinsky},
+  physics_params::physics_params,
+  ode_solver_params::ODE_solver_params)
+
+  @unpack ν,Cd,g,h₀⬇ = physics_params
+  if D==1
+    I = TensorValue(1.0)
+  elseif D==2
+    I = TensorValue(1.0,0.0,0.0,1.0)
+  end
+
+  # Auxiliar functions
+  cₛ = 0.164
+  νₜ(εᵤ,Δx₀) = (cₛ*Δx₀)*(√(2*(εᵤ⊙εᵤ)+1.0e-8 ))
+  absᵤ(u) = (u⋅u + 1.0e-8).^(1/2)
+  dabsᵤ(u,du) = 1/absᵤ(u)*(du⋅u)
+  convᵤ(a,∇u,v) = (a⋅∇u)⋅v
+  strs(∇u,∇v,εᵤ,Δx₀) = ( (ν+νₜ(εᵤ,Δx₀))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,Δx₀))*tr(∇u)*I) ⊙ ∇v
+  strs(∇u,∇v,εᵤ) = ( (ν+νₜ(εᵤ,0.01))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,0.01))*tr(∇u)*I) ⊙ ∇v
+  strs(∇u,∇v) = ( (ν)*(∇u+∇u') - 2/3*(ν)*tr(∇u)*I) ⊙ ∇v
+  drag(u,h,v) = Cd/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
+  dudrag(u,du,h,v) = Cd/(h+h₀⬇)*((dabsᵤ(u,du))*(u⋅v)+(absᵤ(u))*(du⋅v))
+  dhdrag(u,h,dh,v) = -Cd/((h+h₀⬇)*(h+h₀⬇))*(absᵤ(u))*(u⋅v)*dh
+  grad(∇h,v) = g*(v⋅∇h)
+  convₕ(u,h,∇u,∇h,w) = ((u⋅∇h) + (h+h₀⬇)*tr(∇u))*w
+  dhconvₕ(u,dh,∇u,∇dh,w) = ((u⋅∇dh) + (dh)*tr(∇u))*w
+
+  dΩ,dΓwall, = measures
+  nwall, = normals
+  Ω = dΩ.trian
+  Δx₀ = map(Ω.trians) do trian
+    lazy_map(dx->dx^(1/D),get_cell_measure(trian))
+  end
+
+  # Residual form
+  m(t,(uₜ,hₜ),(v,w)) = ∫(uₜ⋅v + hₜ*w)dΩ
+  a(t,(u,h),(v,w)) = ∫( (convᵤ∘(u,∇(u),v)) +
+                        # (strs∘(∇(u),∇(v),ε(u),Δx₀)) +
+                        (strs∘(∇(u),∇(v),ε(u))) +
+                        (drag∘(u,h,v)) +
+                        (grad∘(∇(h),v)) +
+                        (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ
+  res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
+  jac(t,(u,h),(du,dh),(v,w)) =
+    ∫( (convᵤ(du,∇(u),v))  )dΩ +
+    ∫( (convᵤ(u,∇(du),v)) )dΩ +
+    ∫( (strs(∇(du),∇(v))) )dΩ +
+    ∫( (dudrag(u,du,h,v)) )dΩ +
+    ∫( (dhdrag(u,h,dh,v)) )dΩ +
+    ∫( (grad(∇(dh),v)) )dΩ +
+    ∫( (convₕ(du,h,∇(du),∇(h),w)) )dΩ +
+    ∫( (dhconvₕ(u,dh,∇(u),∇(dh),w)) )dΩ
+  jac_t(t,(uₜ,hₜ),(duₜ,dhₜ),(v,w)) = m(t,(duₜ,dhₜ),(v,w))
+
+  return m,a,res,jac,jac_t
 
 end
 

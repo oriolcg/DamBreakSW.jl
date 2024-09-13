@@ -7,6 +7,7 @@ using Gridap
 using GridapGmsh: gmsh, GmshDiscreteModel
 using GridapDistributed
 using GridapPETSc
+using PartitionedArrays
 using Parameters
 
 include("time_integrator.jl")
@@ -36,7 +37,7 @@ options_mumps = "-snes_type newtonls \
 
 function main_parallel(np,params)
   current_path = pwd()
-  cd(output_path)
+  cd(datadir("sims",params.vtk_folder))
   with_mpi() do distribute
     options = options_mumps
     ranks = distribute(LinearIndices((np,)))
