@@ -47,15 +47,8 @@ function main(params::DamBreak_benchmark_2D_params)
   h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
 
   # Define spaces
-  @unpack order = params
-  refFEᵤ = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-  refFEₕ = ReferenceFE(lagrangian,Float64,order-1)
-  Vᵤ = TestFESpace(Ω,refFEᵤ)
-  Vₕ = TestFESpace(Ω,refFEₕ;conformity=:H1)
-  Uᵤ = TransientTrialFESpace(Vᵤ)
-  Uₕ = TransientTrialFESpace(Vₕ)
-  Y = MultiFieldFESpace([Vᵤ,Vₕ])
-  X = TransientMultiFieldFESpace([Uᵤ,Uₕ])
+  @unpack order, formulation = params
+  X,Y = get_FESpaces(Ω,order,[],[],[],Val(formulation))
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
@@ -67,9 +60,9 @@ function main(params::DamBreak_benchmark_2D_params)
   normals = (nΓ,)
 
   # Weak form
-  @unpack formulation = params
-  res = get_residual_form(measures,normals,2,Val(formulation), physics_params)
-  op = TransientFEOperator(res,X,Y)
+  @unpack ode_solver_params = params
+  m,a,res = get_forms(measures,normals,2,Val(formulation), physics_params, ode_solver_params)
+  op = TransientSemilinearFEOperator(m,a,X,Y)
 
   # Solver
   ls = LUSolver()

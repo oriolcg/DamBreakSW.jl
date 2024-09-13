@@ -47,15 +47,8 @@ function main(params::DamBreak_building_params)
   h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
 
   # Define spaces
-  @unpack order = params
-  refFEᵤ = ReferenceFE(lagrangian,VectorValue{2,Float64},order)
-  refFEₕ = ReferenceFE(lagrangian,Float64,order-1)
-  Vᵤ = TestFESpace(Ω,refFEᵤ,dirichlet_tags=["walls","inlet","sides"],dirichlet_masks=[(true,true),(true,false),(false,true)])
-  Vₕ = TestFESpace(Ω,refFEₕ;conformity=:H1)
-  Uᵤ = TransientTrialFESpace(Vᵤ,[u₀,u₀,u₀])
-  Uₕ = TransientTrialFESpace(Vₕ)
-  Y = MultiFieldFESpace([Vᵤ,Vₕ])
-  X = TransientMultiFieldFESpace([Uᵤ,Uₕ])
+  @unpack order, formulation = params
+  X,Y = get_FESpaces(Ω,order,["walls","inlet","sides"],[(true,true),(true,false),(false,true)],[u₀,u₀,u₀],Val(formulation))
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
@@ -67,9 +60,10 @@ function main(params::DamBreak_building_params)
   normals = (nΓ,)
 
   # Weak form
-  @unpack formulation = params
-  res = get_residual_form(measures,normals,2,Val(formulation), physics_params)
-  op = TransientFEOperator(res,X,Y)
+  @unpack ode_solver_params = params
+  m,a,res = get_forms(measures,normals,2,Val(formulation), physics_params, ode_solver_params)
+  # op = TransientFEOperator(res,X,Y)
+  op = TransientSemilinearFEOperator(m,a,X,Y)
 
   # Solver
   ls = LUSolver()
@@ -87,10 +81,15 @@ function main(params::DamBreak_building_params)
 
   # Iterate over time
   @unpack T = params.ode_solver_params
+  tout = 0.0
+  Δtout = 0.05
   createpvd(datadir("sims",vtk_folder,"sol_DB2D")) do pvd
     for (t,(uₕ,hₕ)) in xₕₜ
       println("Time: $t / $T")
-      vtk_output && (pvd[t] = createvtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_$(t).vtu"),cellfields=["u"=>uₕ,"h"=>hₕ],order=order))
+      if t >= tout
+        vtk_output && (pvd[t] = createvtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_$(t).vtu"),cellfields=["u"=>uₕ,"h"=>hₕ],order=order))
+        tout += Δtout
+      end
     end
   end
 

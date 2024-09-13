@@ -13,9 +13,10 @@ params_coarse_2D = DamBreakSW.DamBreak_building_params(
   order=2,
   verbose=true,
   vtk_output=true,
-  vtk_folder="DamBreak_building_0.0_coarse_ASGS",
-  formulation=:ASGS,
-  ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0)
+  vtk_folder="DamBreak_building_0.0_coarse_Smagorinsky",
+  formulation=:Smagorinsky,
+  # ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0)
+  ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3)
 )
 @timeit to "Coarse" DamBreakSW.main(params_coarse_2D)
 
@@ -25,41 +26,11 @@ params_fine_2D = DamBreakSW.DamBreak_building_params(
   order=2,
   verbose=true,
   vtk_output=true,
-  vtk_folder="DamBreak_building_0.0_fine_ASGS",
-  formulation=:ASGS,
-  ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0,T=15.0,Δt=0.01)
+  vtk_folder="DamBreak_building_0.0_fine_Smagorinsky",
+  formulation=:Smagorinsky,
+  # ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0,T=30.0,Δt=0.01)
+  ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3;T=30.0,Δt=0.001)
 )
 @timeit to "Fine" DamBreakSW.main(params_fine_2D)
-
-# # Fine run
-# params_fine_2D = DamBreakSW.DamBreak_benchmark_2D_params(
-#   mesh_file=datadir("meshes","DamBreak_benchmark_2D_fine.msh"),
-#   order=2,
-#   verbose=false,
-#   vtk_output=true,
-#   vtk_folder="DamBreak_benchmark_2D",
-#   ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;T=10.0,ρ∞=0.0)
-# )
-# params_fine_2D_ASGS = DamBreakSW.DamBreak_benchmark_2D_params(
-#   mesh_file=datadir("meshes","DamBreak_benchmark_2D_fine.msh"),
-#   order=2,
-#   formulation=:ASGS,
-#   verbose=false,
-#   vtk_output=true,
-#   vtk_folder="DamBreak_benchmark_2D_ASGS",
-#   ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;T=10.0,ρ∞=0.0)
-# )
-# params_fine_2D_Smagorinsky = DamBreakSW.DamBreak_benchmark_2D_params(
-#   mesh_file=datadir("meshes","DamBreak_benchmark_2D_fine.msh"),
-#   order=2,
-#   formulation=:Smagorinsky,
-#   verbose=false,
-#   vtk_output=true,
-#   vtk_folder="DamBreak_benchmark_2D_Smagorinsky",
-#   ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;T=10.0,ρ∞=0.0)
-# )
-# @timeit to "DamBreak_benchmark_2D" DamBreakSW.main(params_fine_2D)
-# # @timeit to "DamBreak_benchmark_2D_ASGS" DamBreakSW.main(params_fine_2D_ASGS)
-# @timeit to "DamBreak_benchmark_2D_Smagorinsky" DamBreakSW.main(params_fine_2D_Smagorinsky)
 
 show(to)

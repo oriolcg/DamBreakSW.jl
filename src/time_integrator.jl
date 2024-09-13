@@ -14,12 +14,20 @@ end
   T::Float64 = 0.25
 end
 
+@with_kw struct EXRK_params <: ODE_solver_params
+  type::Symbol = :EXRK_SSP_3_3
+  Δt::Float64 = 0.25
+  T::Float64 = 0.25
+end
+
 ODE_solver_params() = theta_method_params()
 function ODE_solver_params(type::Symbol;kwargs...)
   if type == :θ_method
     return theta_method_params(;kwargs...)
   elseif type == :Generalized_α
     return Generalized_α_params(;kwargs...)
+  elseif type == :EXRK_SSP_3_3
+    return EXRK_params(;kwargs...)
   else
     error("ODE solver type not recognized")
   end
@@ -35,7 +43,12 @@ function get_ode_solver(nls,params::Generalized_α_params)
   return GeneralizedAlpha1(nls,Δt,ρ∞)
 end
 
-function get_solution(odes,op,x₀,xdot₀,params::theta_method_params)
+function get_ode_solver(nls,params::EXRK_params)
+  @unpack type,T,Δt = params
+  return RungeKutta(nls.ls,nls.ls,Δt,type)
+end
+
+function get_solution(odes,op,x₀,xdot₀,params::Union{theta_method_params,EXRK_params})
   @unpack T = params
   return solve(odes,op,0.0,T,x₀)
 end

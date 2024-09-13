@@ -49,15 +49,8 @@ function main(params::DamBreak_benchmark_1D_params)
   h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
 
   # Define spaces
-  @unpack order = params
-  refFEᵤ = ReferenceFE(lagrangian,VectorValue{1,Float64},order)
-  refFEₕ = ReferenceFE(lagrangian,Float64,order-1)
-  Vᵤ = TestFESpace(Ω,refFEᵤ,dirichlet_tags="boundary")
-  Vₕ = TestFESpace(Ω,refFEₕ;conformity=:H1)
-  Uᵤ = TransientTrialFESpace(Vᵤ,u₀)
-  Uₕ = TransientTrialFESpace(Vₕ)
-  Y = MultiFieldFESpace([Vᵤ,Vₕ])
-  X = TransientMultiFieldFESpace([Uᵤ,Uₕ])
+  @unpack order, formulation = params
+  X,Y = get_FESpaces(Ω,order,["boundary"],[(true,)],[u₀],Val(formulation))
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
@@ -68,14 +61,14 @@ function main(params::DamBreak_benchmark_1D_params)
   normals = (get_normal_vector(Γ),)
 
   # Weak form
-  @unpack formulation = params
-  res = get_residual_form(measures,normals,1,Val(formulation), physics_params)
-  op = TransientFEOperator(res,X,Y)
+  @unpack ode_solver_params = params
+  m,a,res = get_forms(measures,normals,1,Val(formulation), physics_params, ode_solver_params)
+  op = TransientSemilinearFEOperator(m,a,X,Y)
 
   # Solver
   ls = LUSolver()
   nls = NLSolver(ls,show_trace=verbose,iterations=10,method=:newton)
-  odes = get_ode_solver(nls,params.ode_solver_params)
+  odes = get_ode_solver(nls,ode_solver_params)
 
   # Initial solution
   xₕ₀ = interpolate_everywhere([u₀(0),h₀],X)
@@ -84,7 +77,7 @@ function main(params::DamBreak_benchmark_1D_params)
   vtk_output && writevtk(Ω,datadir("sims","test","sol_DB1D_0.vtu"),cellfields=["u"=>xₕ₀[1],"h"=>xₕ₀[2]])
 
   # Solution
-  xₕₜ = get_solution(odes,op,xₕ₀,xdotₕ₀,params.ode_solver_params)
+  xₕₜ = get_solution(odes,op,xₕ₀,xdotₕ₀,ode_solver_params)
 
   # Iterate over time
   @unpack T = params.ode_solver_params

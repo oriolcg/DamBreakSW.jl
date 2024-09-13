@@ -15,15 +15,46 @@ The parameters are:
   g::Float64 = 9.8      # Gravity
 end
 
+# FE Spaces
+function get_FESpaces(Ω,order::Int,DTags,DMasks,DValues,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})
+  D = num_dims(Ω)
+  refFEᵤ = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
+  refFEₕ = ReferenceFE(lagrangian,Float64,order-1)
+  Vᵤ = TestFESpace(Ω,refFEᵤ,dirichlet_tags=DTags,dirichlet_masks=DMasks)
+  Vₕ = TestFESpace(Ω,refFEₕ;conformity=:H1)
+  Uᵤ = TransientTrialFESpace(Vᵤ,DValues)
+  Uₕ = TransientTrialFESpace(Vₕ)
+  Y = MultiFieldFESpace([Vᵤ,Vₕ])
+  X = TransientMultiFieldFESpace([Uᵤ,Uₕ])
+  return X,Y
+end
+
+function get_FESpaces(Ω,order::Int,DTags,DMasks,DValues,::Val{:VectorInvariant})
+  refFEᵤ = ReferenceFE(raviart_thomas,Float64,order-1)
+  refFEₕ = ReferenceFE(lagrangian,Float64,order-1)
+  refFEq = ReferenceFE(lagrangian,Float64,order)
+  Vᵤ = TestFESpace(Ω,refFEᵤ,conformity=:Hdiv)#,dirichlet_tags=DTags,dirichlet_masks=DMasks)
+  Vₕ = TestFESpace(Ω,refFEₕ;conformity=:L2)
+  Vq = TestFESpace(Ω,refFEq;conformity=:H1)
+  Uᵤ = TransientTrialFESpace(Vᵤ)#,DValues)
+  Uₕ = TransientTrialFESpace(Vₕ)
+  Uq = TransientTrialFESpace(Vq)
+  Y = MultiFieldFESpace([Vᵤ,Vₕ,Vᵤ,Vₕ,Vq])
+  X = TransientMultiFieldFESpace([Uᵤ,Uₕ,Uᵤ,Uₕ,Uq])
+  return (X,Y)
+end
+
 # Residual functions
 """
-    get_residual_form(::Val{:Galerkin},params::physics_params)
+    get_forms(::Val{:Galerkin},params::physics_params)
 
-Get the residual form for the standard Galerkin method.
+Get the FE operator forms for the standard Galerkin method.
 """
-function get_residual_form(measures,normals,D,::Val{:Galerkin},params::physics_params)
+function get_forms(measures,normals,D,::Val{:Galerkin},
+  physics_params::physics_params,
+  ode_solver_params::ODE_solver_params)
 
-  @unpack ν,Cd,g,h₀⬇ = params
+  @unpack ν,Cd,g,h₀⬇ = physics_params
   if D==1
     I = TensorValue(1.0)
   elseif D==2
@@ -54,19 +85,20 @@ function get_residual_form(measures,normals,D,::Val{:Galerkin},params::physics_p
                     #  ∫( (gradΓ∘(h,v,nwall)) )dΓwall
   res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
 
-  return res
+  return m,a,res
 
 end
 
-
 """
-    get_residual_form(::Val{:ASGS},params::physics_params)
+    get_forms(::Val{:ASGS},params::physics_params)
 
-Get the residual form for the stabilized formulation using Algebraic Subgrid Scales (ASGS).
+Get the FE operator forms for the stabilized formulation using Algebraic Subgrid Scales (ASGS).
 """
-function get_residual_form(measures,normals,D,::Val{:ASGS},params::physics_params)
+function get_forms(measures,normals,D,::Val{:ASGS},
+  physics_params::physics_params,
+  ode_solver_params::ODE_solver_params)
 
-  @unpack ν,Cd,g,h₀⬇ = params
+  @unpack ν,Cd,g,h₀⬇ = physics_params
   if D==1
     I = TensorValue(1.0)
   elseif D==2
@@ -87,40 +119,41 @@ function get_residual_form(measures,normals,D,::Val{:ASGS},params::physics_param
   Rᵤ(u,h,uₜ,∇u,∇h) = uₜ + u⋅∇u + g*∇h + Cd/(h+h₀⬇)*(absᵤ(u))*u
   Lᵤᵃ(u,∇v,∇w) = - u⋅∇v - g*∇w
   Lₕᵃ(u,h,∇v,∇w) = - u⋅∇w - (h+h₀⬇)*(tr(∇v))
-  τᵤ(a,h,Δxₒ) = 1.0 / ((c₁*ν / (Δxₒ^2)) + (c₂*absᵤ(a) ./ Δxₒ) + (c₃*Cd*g*absᵤ(a) / (h+1e-14)))
+  τᵤ(a,h,Δxₒ) = 1.0 / ((c₁*ν / (Δxₒ^2)) + (c₂*absᵤ(a) / Δxₒ) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8)))
   τₕ(a,h,Δxₒ) = (Δxₒ^2)/(c₁*τᵤ(a,h,Δxₒ))
   stabₕ(u,h,hₜ,∇u,∇h,∇v,∇w,Δxₒ) = (τₕ∘(u,h,Δxₒ))*((Rₕ∘(u,h,hₜ,∇u,∇h))*Lₕᵃ(u,h,∇v,∇w))
   stabᵤ(u,h,uₜ,∇u,∇h,∇v,∇w,Δxₒ) = (τᵤ∘(u,h,Δxₒ))*((Rᵤ∘(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w))
 
+  dΩ,dΓwall, = measures
+  nwall, = normals
   Ω = get_triangulation(dΩ.quad)
   Δxₒ = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
 
   # Residual form
-  dΩ,dΓwall, = measures
-  nwall, = normals
   m(t,(uₜ,hₜ),(v,w)) = ∫(uₜ⋅v + hₜ*w)dΩ
   a(t,(u,h),(v,w)) = ∫( (convᵤ∘(u,∇(u),v)) +
                         (strs∘(∇(u),∇(v))) +
                         (drag∘(u,h,v)) +
                         (grad∘(∇(h),v)) +
                         (convₕ∘(u,h,∇(u),∇(h),w)) -
-                        (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δxₒ)) -
-                        (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δxₒ)) )dΩ
+                        (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δxₒ)) )dΩ#-
+                        # (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δxₒ)) )dΩ
   res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
 
-  return res
+  return m,a,res
 
 end
 
-
 """
-    get_residual_form(::Val{:Smagorinsky},params::physics_params)
+    get_forms(::Val{:Smagorinsky},params::physics_params)
 
-Get the residual form for the standard Galerkin method.
+Get the operator forms for the Smagorinsky method.
 """
-function get_residual_form(measures,normals,D,::Val{:Smagorinsky},params::physics_params)
+function get_forms(measures,normals,D,::Val{:Smagorinsky},
+  physics_params::physics_params,
+  ode_solver_params::ODE_solver_params)
 
-  @unpack ν,Cd,g,h₀⬇ = params
+  @unpack ν,Cd,g,h₀⬇ = physics_params
   if D==1
     I = TensorValue(1.0)
   elseif D==2
@@ -128,8 +161,8 @@ function get_residual_form(measures,normals,D,::Val{:Smagorinsky},params::physic
   end
 
   # Auxiliar functions
-  cₛ = 0.2
-  νₜ(εᵤ,Δx₀) = cₛ*Δx₀^2*(√(2*(εᵤ⊙εᵤ)+1.0e-8 ))
+  cₛ = 0.164
+  νₜ(εᵤ,Δx₀) = (cₛ*Δx₀)^2*(√(2*(εᵤ⊙εᵤ)+1.0e-8 ))
   absᵤ(u) = √(u⋅u + 1.0e-8)
   convᵤ(a,∇u,v) = (a⋅∇u)⋅v
   strs(∇u,∇v,εᵤ,Δx₀) = ( (ν+νₜ(εᵤ,Δx₀))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,Δx₀))*tr(∇u)*I) ⊙ ∇v
@@ -151,6 +184,48 @@ function get_residual_form(measures,normals,D,::Val{:Smagorinsky},params::physic
                         (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ
   res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
 
-  return res
+  return m,a,res
+
+end
+
+"""
+    get_forms(::Val{:VectorInvariant},params::physics_params)
+
+Get the operator forms for the vector-invariant formulation.
+"""
+function get_forms(measures,normals,D,::Val{:VectorInvariant},
+  physics_params::physics_params,
+  ode_solver_params::ODE_solver_params)
+
+  @unpack ν,Cd,g,h₀⬇ = physics_params
+  if D==1
+    I = TensorValue(1.0)
+  elseif D==2
+    I = TensorValue(1.0,0.0,0.0,1.0)
+  end
+
+  # Auxiliar functions
+  vecPerp(u) = VectorValue(-deepcopy(u[2]),deepcopy(u[1]))
+  gradPerp(∇ϕ::VectorValue{2}) = VectorValue( -deepcopy(∇ϕ[2]), deepcopy(∇ϕ[1]))
+
+  dΩ,dΓwall, = measures
+  nwall, = normals
+  Ω = get_triangulation(dΩ.quad)
+  Δx₀ = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
+
+  # Residual form
+  @unpack Δt = ode_solver_params
+  m(t,(uₜ,hₜ,),(v,w,)) = ∫(uₜ⋅v + hₜ*w)dΩ
+  a(t,(u,h,F,Φ,q),(v,w,s,ψ,p)) = (
+    ∫( (∇⋅F)*w  )dΩ
+  - ∫( (∇⋅v)*Φ  )dΩ
+  + ∫( (q - 0.5*Δt*(u⋅∇(q)) )*(vecPerp∘(F)⋅v)  )dΩ
+  + ∫( F⋅s - h*(u⋅s) )dΩ
+  + ∫( Φ*ψ - (0.5*(u⋅u) + g*h)*ψ )dΩ
+  + ∫( q*h*p + gradPerp∘(∇(p))⋅u )dΩ
+  )
+  res(t,(u,h,F,Φ,q),(v,w,s,ψ,p)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
+
+  return m,a,res
 
 end
