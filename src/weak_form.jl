@@ -19,9 +19,14 @@ end
 function get_FESpaces(Ω,D,order::Int,DTags,DMasks,DValues,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})
   refFEᵤ = ReferenceFE(lagrangian,VectorValue{D,Float64},order)
   refFEₕ = ReferenceFE(lagrangian,Float64,order-1)
-  Vᵤ = TestFESpace(Ω,refFEᵤ,dirichlet_tags=DTags,dirichlet_masks=DMasks)
   Vₕ = TestFESpace(Ω,refFEₕ;conformity=:H1)
-  Uᵤ = TransientTrialFESpace(Vᵤ,DValues)
+  if isempty(DValues)
+    Vᵤ = TestFESpace(Ω,refFEᵤ)
+    Uᵤ = TransientTrialFESpace(Vᵤ)
+  else
+    Vᵤ = TestFESpace(Ω,refFEᵤ,dirichlet_tags=DTags,dirichlet_masks=DMasks)
+    Uᵤ = TransientTrialFESpace(Vᵤ,DValues)
+  end
   Uₕ = TransientTrialFESpace(Vₕ)
   Y = MultiFieldFESpace([Vᵤ,Vₕ])
   X = TransientMultiFieldFESpace([Uᵤ,Uₕ])
@@ -41,6 +46,18 @@ function get_FESpaces(Ω,D,order::Int,DTags,DMasks,DValues,::Val{:VectorInvarian
   Y = MultiFieldFESpace([Vᵤ,Vₕ,Vᵤ,Vₕ,Vq])
   X = TransientMultiFieldFESpace([Uᵤ,Uₕ,Uᵤ,Uₕ,Uq])
   return (X,Y)
+end
+
+function get_FESpaces(Ω,D,order::Int,DTags,DMasks,DValues,::Val{:conservative_Galerkin})
+  refFEᵤ = ReferenceFE(lagrangian,VectorValue{D+1,Float64},order)
+  if isempty(DValues)
+    V = TestFESpace(Ω,refFEᵤ)
+    U = TransientTrialFESpace(V)
+  else
+    V = TestFESpace(Ω,refFEᵤ,dirichlet_tags=DTags,dirichlet_masks=DMasks)
+    U = TransientTrialFESpace(V,DValues)
+  end
+  return U,V
 end
 
 # Residual functions
@@ -290,4 +307,91 @@ function get_forms(measures,normals,D,::Val{:VectorInvariant},
 
   return m,a,res
 
+end
+
+
+"""
+    get_forms(::Val{:Galerkin},params::physics_params)
+
+Get the FE operator forms for the standard Galerkin method.
+"""
+function get_forms(measures,normals,D,::Val{:conservative_Galerkin},
+  physics_params::physics_params,
+  ode_solver_params::ODE_solver_params)
+
+  @unpack ν,Cd,g,h₀⬇ = physics_params
+  if D==1
+    @error "1D not implemented"
+  elseif D==2
+    I = TensorValue(1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0)
+  end
+
+  # Auxiliar functions
+  H(h) = h+h₀⬇
+  𝒜₁(u) = TensorValue(
+    0, 1.0, 0,
+    g*u[1]-(u[2]/u[1])^2, 2*u[2]/u[1], 0,
+    -u[2]*u[3]/(u[1]*u[1]), u[3]/u[1], u[2]/u[1]
+  )
+  𝒜₂(u) = TensorValue(
+    0, 0, 1.0,
+    -u[2]*u[3]/(u[1]*u[1]), u[3]/u[1], u[2]/u[1],
+    g*u[1]-(u[3]/u[1])^2, 0, 2*u[3]/u[1]
+  )
+  𝒦₁₁(u) = TensorValue(
+    0, 0, 0,
+    -2ν*u[2]/u[1], 2ν, 0,
+    -ν*u[3]/u[1], 0, ν
+  )
+  𝒦₁₂(u) = TensorValue(
+    0, 0, 0,
+    0, 0, 0,
+    -ν*u[2]/u[1], ν, 0
+  )
+  𝒦₂₁(u) = TensorValue(
+    0, 0, 0,
+    -ν*u[3]/u[1], 0, ν,
+    0, 0, 0
+  )
+  𝒦₂₂(u) = TensorValue(
+    0, 0, 0,
+    -ν*u[2]/u[1], ν, 0,
+    -2ν*u[3]/u[1], 0, 2ν
+  )
+  ℛ(u) = ∂t(u) + 𝒵(u)
+  𝒵(u) = (𝒜₁∘u)⋅(∇₁(u)) + (𝒜₂∘u)⋅∇₂(u)
+
+  ∇₁(u) = VectorValue(1.0,0.0)⋅∇(u)
+  ∇₂(u) = VectorValue(0.0,1.0)⋅∇(u)
+
+  dΩ,dΓwall, = measures
+  nwall, = normals
+  Ω = get_triangulation(dΩ.quad)
+  h = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
+  _abs(u) = √(u[2]^2+u[3]^2 + 1.0e-8)
+  τ(u,h) = 1/(4*ν/h^2 + 2*_abs(u)/h)
+  ∇h(∇u) = ∇u⋅VectorValue(1.0,0.0,0.0)
+  _absh(∇h) = √(∇h[1]^2+∇h[2]^2 + 1.0e-8)
+  τshoc(u,∇u,h) = h/(2*_abs(u))*(_absh(∇h(∇u))*h/(h₀⬇))
+  νshoc(u,∇u,h) = τshoc(u,∇u,h)*_abs(u)^2
+
+  # Residual form
+  dΩ,dΓwall, = measures
+  nwall, = normals
+  m(t,uₜ,w) = ∫( uₜ⋅w )dΩ
+  a(t,u,w) = ∫( ((𝒜₁∘u)⋅(∇₁(u)) + (𝒜₂∘u)⋅∇₂(u))⋅w +
+                ((𝒦₁₁∘u)⋅(∇₁(u)) + (𝒦₁₂∘u)⋅∇₂(u))⊙(∇₁(w))+
+                ((𝒦₂₁∘u)⋅(∇₁(u)) + (𝒦₂₂∘u)⋅∇₂(u))⊙(∇₂(w)) +
+                (τ∘(u,h))*(((𝒜₁∘u)⋅(∇₁(w)) + (𝒜₂∘u)⋅∇₂(w))⋅ℛ(u)) +
+                (νshoc∘(u,∇(u),h))*(∇₁(u)⋅∇₁(w) + ∇₂(u)⋅∇₂(w)) )dΩ
+  res(t,(u,h),(v,w)) = m(t,∂t(u),v) + a(t,u,w)
+
+  return m,a,res
+
+end
+
+# FE operator
+function get_FEOperator(forms,X,Y,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky},Val{:conservative_Galerkin}})
+  m,a,res = forms
+  return TransientSemilinearFEOperator(m,a,X,Y)
 end

@@ -48,7 +48,13 @@ function main(params::DamBreak_benchmark_2D_params)
 
   # Define spaces
   @unpack order, formulation = params
-  X,Y = get_FESpaces(Ω,order,[],[],[],Val(formulation))
+  dirichlet_tags, dirichlet_masks, dirichlet_values = _get_dirichlet(Val(formulation))
+  X,Y = get_FESpaces(Ω,2,order,
+    dirichlet_tags,
+    dirichlet_masks,
+    dirichlet_values,
+    Val(formulation)
+  )
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
@@ -61,19 +67,18 @@ function main(params::DamBreak_benchmark_2D_params)
 
   # Weak form
   @unpack ode_solver_params = params
-  m,a,res = get_forms(measures,normals,2,Val(formulation), physics_params, ode_solver_params)
-  op = TransientSemilinearFEOperator(m,a,X,Y)
+  forms = get_forms(measures,normals,2,Val(formulation), physics_params, ode_solver_params)
+  op = get_FEOperator(forms,X,Y,Val(formulation))
 
   # Solver
   ls = LUSolver()
-  nls = NLSolver(ls,show_trace=verbose,iterations=10,method=:newton)
+  nls = NLSolver(ls,show_trace=verbose,iterations=20,method=:newton)
   odes = get_ode_solver(nls,params.ode_solver_params)
 
   # Initial solution
-  xₕ₀ = interpolate_everywhere([u₀(0),h₀],X)
-  xdotₕ₀ = interpolate_everywhere([VectorValue(0.0,0.0),0.0],X)
+  xₕ₀, xdotₕ₀ = _get_initial_solution(u₀,h₀,h₀⬇,X,Val(formulation))
   @unpack vtk_output, vtk_folder = params
-  vtk_output && writevtk(Ω,datadir("sims","test","sol_DB2D_0.vtu"),cellfields=["u"=>xₕ₀[1],"h"=>xₕ₀[2]])
+  vtk_output && _writevtk(Ω,vtk_folder,xₕ₀,Val(formulation))
 
   # Solution
   xₕₜ = get_solution(odes,op,xₕ₀,xdotₕ₀,params.ode_solver_params)
@@ -81,12 +86,43 @@ function main(params::DamBreak_benchmark_2D_params)
   # Iterate over time
   @unpack T = params.ode_solver_params
   createpvd(datadir("sims",vtk_folder,"sol_DB2D")) do pvd
-    for (t,(uₕ,hₕ)) in xₕₜ
+    for (t,xₕ) in xₕₜ
       println("Time: $t / $T")
-      vtk_output && (pvd[t] = createvtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_$(t).vtu"),cellfields=["u"=>uₕ,"h"=>hₕ],order=order))
+      vtk_output && (pvd[t] = _createvtk(Ω,vtk_folder,order,xₕ,t,Val(formulation)))
     end
   end
 
   return nothing
 
+end
+
+function _get_dirichlet(::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})
+  return String[], Tuple{Bool}[], Function[]
+end
+function _get_dirichlet(::Val{:conservative_Galerkin})
+  U₀(x,t) = VectorValue(0.0,0.0,0.0)
+  U₀(t) = x->U₀(x,t)
+  return ["wall"], [(false,true,true)], [U₀]
+end
+
+function _get_initial_solution(u₀,h₀,h₀⬇,X,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})
+  return interpolate_everywhere([u₀(0),h₀],X), interpolate_everywhere([VectorValue(0.0),0.0],X)
+end
+function _get_initial_solution(u₀,h₀,h₀⬇,X,::Val{:conservative_Galerkin})
+  U₀(x) = VectorValue(h₀(x)+h₀⬇,u₀(x,0.0)[1],u₀(x,0.0)[2])
+  return interpolate_everywhere(U₀,X), interpolate_everywhere(VectorValue(0.0,0.0,0.0),X)
+end
+
+function _createvtk(Ω,vtk_folder,order,xₕ,t,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})
+  createvtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_$(t).vtu"),cellfields=["u"=>xₕ[1],"h"=>xₕ[2]],order=order)
+end
+function _createvtk(Ω,vtk_folder,order,xₕ,t,::Val{:conservative_Galerkin})
+  createvtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_$(t).vtu"),cellfields=["U"=>xₕ],order=order)
+end
+
+function _writevtk(Ω,vtk_folder,xₕ₀,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})
+  writevtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_0.vtu"),cellfields=["u"=>xₕ₀[1],"h"=>xₕ₀[2]])
+end
+function _writevtk(Ω,vtk_folder,xₕ₀,::Val{:conservative_Galerkin})
+  writevtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_0.vtu"),cellfields=["U"=>xₕ₀])
 end

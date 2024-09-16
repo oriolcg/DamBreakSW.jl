@@ -50,7 +50,7 @@ function main(params::DamBreak_benchmark_1D_params)
 
   # Define spaces
   @unpack order, formulation = params
-  X,Y = get_FESpaces(Ω,order,["boundary"],[(true,)],[u₀],Val(formulation))
+  X,Y = get_FESpaces(Ω,1,order,["boundary"],[(true,)],[u₀],Val(formulation))
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
