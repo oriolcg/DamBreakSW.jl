@@ -28,10 +28,10 @@ params_coarse_1D_Smagorinsky_EXRK = DamBreakSW.DamBreak_benchmark_1D_params(
   verbose=false,
   ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3)
 )
-DamBreakSW.main(params_coarse_1D)
+# DamBreakSW.main(params_coarse_1D)
 DamBreakSW.main(params_coarse_1D_ASGS)
-DamBreakSW.main(params_coarse_1D_Smagorinsky)
-DamBreakSW.main(params_coarse_1D_Smagorinsky_EXRK)
+# DamBreakSW.main(params_coarse_1D_Smagorinsky)
+# DamBreakSW.main(params_coarse_1D_Smagorinsky_EXRK)
 
 to = TimerOutput()
 
@@ -71,9 +71,9 @@ params_1D_Smagorinsky_EXRK = DamBreakSW.DamBreak_benchmark_1D_params(
   vtk_folder="DamBreak_benchmark_1D_Smagorinsky_EXRK",
   ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3;T=60.0,Δt=0.2)
 )
-@timeit to "DamBreak_benchmark_1D" DamBreakSW.main(params_1D)
+# @timeit to "DamBreak_benchmark_1D" DamBreakSW.main(params_1D)
 @timeit to "DamBreak_benchmark_1D_ASGS" DamBreakSW.main(params_1D_ASGS)
-@timeit to "DamBreak_benchmark_1D_Smagorinsky" DamBreakSW.main(params_1D_Smagorinsky)
-@timeit to "DamBreak_benchmark_1D_Smagorinsky_EXRK" DamBreakSW.main(params_1D_Smagorinsky_EXRK)
+# @timeit to "DamBreak_benchmark_1D_Smagorinsky" DamBreakSW.main(params_1D_Smagorinsky)
+# @timeit to "DamBreak_benchmark_1D_Smagorinsky_EXRK" DamBreakSW.main(params_1D_Smagorinsky_EXRK)
 
 show(to)
