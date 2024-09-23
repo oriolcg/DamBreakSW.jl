@@ -146,17 +146,16 @@ function get_forms(measures,normals,D,::Val{:ASGS},
   Δxₒ = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
 
   # Residual form
-  m(t,(uₜ,hₜ),(v,w)) = ∫(uₜ⋅v + hₜ*w)dΩ
-  a(t,(u,h),(v,w)) = ∫( (convᵤ∘(u,∇(u),v)) +
+  res(t,(u,h),(v,w)) = ∫( ∂t(u)⋅v + ∂t(h)*w +
+                        (convᵤ∘(u,∇(u),v)) +
                         (strs∘(∇(u),∇(v))) +
                         (drag∘(u,h,v)) +
                         (grad∘(∇(h),v)) +
                         (convₕ∘(u,h,∇(u),∇(h),w)) -
-                        (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δxₒ)) )dΩ#-
-                        # (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δxₒ)) )dΩ
-  res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
+                        (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δxₒ)) -
+                        (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δxₒ)) )dΩ
 
-  return m,a,res
+  return nothing,nothing,res
 
 end
 
@@ -358,18 +357,26 @@ function get_forms(measures,normals,D,::Val{:conservative_Galerkin},
     -ν*u[2]/u[1], ν, 0,
     -2ν*u[3]/u[1], 0, 2ν
   )
-  ℛ(u) = ∂t(u) + 𝒵(u)
+  R(u,∇₁u,∇₂u,εu) = VectorValue(
+    0,
+    -2ν*(∇₁u[1]*εu[1,1]+∇₂u[1]*εu[1,2]),# + g*Cd*_abs(u)*u[2]/((u[1] + 1.0e-8)^(1/3)),
+    -2ν*(∇₁u[1]*εu[2,1]+∇₂u[1]*εu[2,2])# + g*Cd*_abs(u)*u[3]/((u[1] + 1.0e-8)^(1/3))
+  )
+  ℛ(u) = ∂t(u) + 𝒵(u) - (R∘(u,∇₁(u),∇₂(u),εᵤ(u))) # only true for 1st order
+  # ℛ(u) = 𝒵(u) - (R∘(u,∇₁(u),∇₂(u),εᵤ(u)))
   𝒵(u) = (𝒜₁∘u)⋅(∇₁(u)) + (𝒜₂∘u)⋅∇₂(u)
 
   ∇₁(u) = VectorValue(1.0,0.0)⋅∇(u)
   ∇₂(u) = VectorValue(0.0,1.0)⋅∇(u)
+  ∇ᵤ(u) = ∇(u)⋅TensorValue{3,2}(0.0,0.0,1.0,0.0,0.0,1.0)
+  εᵤ(u) = 1/2*(∇ᵤ(u) + ∇ᵤ(u)')
 
   dΩ,dΓwall, = measures
   nwall, = normals
   Ω = get_triangulation(dΩ.quad)
   h = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
   _abs(u) = √(u[2]^2+u[3]^2 + 1.0e-8)
-  τ(u,h) = 1/(4*ν/h^2 + 2*_abs(u)/h)
+  τ(u,h) = 1/(12*ν/h^2)# + 2*_abs(u)/h)
   ∇h(∇u) = ∇u⋅VectorValue(1.0,0.0,0.0)
   _absh(∇h) = √(∇h[1]^2+∇h[2]^2 + 1.0e-8)
   τshoc(u,∇u,h) = h/(2*_abs(u))*(_absh(∇h(∇u))*h/(h₀⬇))
@@ -378,20 +385,24 @@ function get_forms(measures,normals,D,::Val{:conservative_Galerkin},
   # Residual form
   dΩ,dΓwall, = measures
   nwall, = normals
-  m(t,uₜ,w) = ∫( uₜ⋅w )dΩ
-  a(t,u,w) = ∫( ((𝒜₁∘u)⋅(∇₁(u)) + (𝒜₂∘u)⋅∇₂(u))⋅w +
-                ((𝒦₁₁∘u)⋅(∇₁(u)) + (𝒦₁₂∘u)⋅∇₂(u))⊙(∇₁(w))+
+  # m(t,uₜ,w) = ∫( uₜ⋅w )dΩ
+  res(t,u,w) = ∫( ℛ(u)⋅w +
+                ((𝒦₁₁∘u)⋅(∇₁(u)) + (𝒦₁₂∘u)⋅∇₂(u))⊙(∇₁(w)) +
                 ((𝒦₂₁∘u)⋅(∇₁(u)) + (𝒦₂₂∘u)⋅∇₂(u))⊙(∇₂(w)) +
-                (τ∘(u,h))*(((𝒜₁∘u)⋅(∇₁(w)) + (𝒜₂∘u)⋅∇₂(w))⋅ℛ(u)) +
-                (νshoc∘(u,∇(u),h))*(∇₁(u)⋅∇₁(w) + ∇₂(u)⋅∇₂(w)) )dΩ
-  res(t,(u,h),(v,w)) = m(t,∂t(u),v) + a(t,u,w)
+                (τ∘(u,h))*((∇₁(w)⋅(𝒜₁∘u) + ∇₂(w)⋅(𝒜₂∘u))⋅ℛ(u)) )dΩ#+
+                # (νshoc∘(u,∇(u),h))*(∇₁(u)⋅∇₁(w) + ∇₂(u)⋅∇₂(w)) )dΩ
+  # res(t,(u,h),(v,w)) = m(t,∂t(u),v) + a(t,u,w)
 
-  return m,a,res
+  return nothing,nothing,res
 
 end
 
 # FE operator
-function get_FEOperator(forms,X,Y,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky},Val{:conservative_Galerkin}})
+function get_FEOperator(forms,X,Y,::Union{Val{:Galerkin},Val{:Smagorinsky},Val{:conservative_Galerkin}})
   m,a,res = forms
   return TransientSemilinearFEOperator(m,a,X,Y)
+end
+function get_FEOperator(forms,X,Y,::Union{Val{:ASGS},Val{:conservative_Galerkin}})
+  _,_,res = forms
+  return TransientFEOperator(res,X,Y)
 end

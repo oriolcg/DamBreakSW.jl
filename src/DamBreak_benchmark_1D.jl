@@ -62,8 +62,8 @@ function main(params::DamBreak_benchmark_1D_params)
 
   # Weak form
   @unpack ode_solver_params = params
-  m,a,res = get_forms(measures,normals,1,Val(formulation), physics_params, ode_solver_params)
-  op = TransientSemilinearFEOperator(m,a,X,Y)
+  forms = get_forms(measures,normals,1,Val(formulation), physics_params, ode_solver_params)
+  op = get_FEOperator(forms,X,Y,Val(formulation))
 
   # Solver
   ls = LUSolver()
