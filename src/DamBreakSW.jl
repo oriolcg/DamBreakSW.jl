@@ -9,7 +9,6 @@ using GridapDistributed
 using GridapPETSc
 using PartitionedArrays
 using Parameters
-using LineSearches: BackTracking
 
 include("time_integrator.jl")
 include("weak_form.jl")
