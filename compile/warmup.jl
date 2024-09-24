@@ -8,8 +8,10 @@ params_coarse_2D = DamBreakSW.DamBreak_building_params(
   order=2,
   verbose=true,
   vtk_output=true,
-  vtk_folder="DamBreak_building_0.0_coarse_Smagorinsky",
-  formulation=:Smagorinsky,
+  # vtk_folder="DamBreak_building_0.0_coarse_Smagorinsky",
+  vtk_folder="DamBreak_building_0.0_coarse_ASGS",
+  # formulation=:Smagorinsky,
+  formulation=:ASGS,
   ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0)
   # ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3)
 )

@@ -25,8 +25,8 @@ export main, main_parallel
 options_mumps = "-snes_type newtonls \
 -snes_linesearch_type basic  \
 -snes_linesearch_damping 1.0 \
--snes_rtol 1.0e-6 \
--snes_atol 1.0e-8 \
+-snes_rtol 1.0e-8 \
+-snes_atol 1.0e-10 \
 -snes_max_it 20 \
 -ksp_error_if_not_converged true \
 -ksp_converged_reason -ksp_type preonly \

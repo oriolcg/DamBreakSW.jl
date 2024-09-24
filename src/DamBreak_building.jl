@@ -20,6 +20,7 @@ A structure to store the parameters of the 2D Dam Break benchmark. The parameter
   verbose::Bool = false # Verbosity
   vtk_output::Bool = false # Output VTK files
   vtk_folder::String = "test"  # Folder name to store VTK files (inside `data/sims`)
+  Δtout::Float64 = 0.05 # output time step
   physics_params::physics_params = physics_params(g=9.81,ν=1.0e-6,h₀⬆=0.63,h₀⬇=0.03,Cd=0.0127) # Physical parameters
   ode_solver_params::ODE_solver_params = ODE_solver_params() # ODE solver parameters
 end
@@ -74,8 +75,8 @@ function main(params::DamBreak_building_params)
   # Initial solution
   xₕ₀ = interpolate_everywhere([u₀(0),h₀],X)
   xdotₕ₀ = interpolate_everywhere([VectorValue(0.0,0.0),0.0],X)
-  @unpack vtk_output, vtk_folder = params
-  vtk_output && writevtk(Ω,datadir("sims","test","sol_DB2D_0.vtu"),cellfields=["u"=>xₕ₀[1],"h"=>xₕ₀[2]])
+  @unpack vtk_output, vtk_folder, Δtout = params
+  vtk_output && writevtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_0.vtu"),cellfields=["u"=>xₕ₀[1],"h"=>xₕ₀[2]])
 
   # Solution
   xₕₜ = get_solution(odes,op,xₕ₀,xdotₕ₀,params.ode_solver_params)
@@ -83,7 +84,6 @@ function main(params::DamBreak_building_params)
   # Iterate over time
   @unpack T = params.ode_solver_params
   tout = 0.0
-  Δtout = 0.05
   createpvd(datadir("sims",vtk_folder,"sol_DB2D")) do pvd
     for (t,(uₕ,hₕ)) in xₕₜ
       println("Time: $t / $T")
@@ -151,7 +151,7 @@ function main(ranks,params::DamBreak_building_params)
   # Initial solution
   xₕ₀ = interpolate_everywhere([u₀(0),h₀],X)
   xdotₕ₀ = interpolate_everywhere([VectorValue(0.0,0.0),0.0],X)
-  @unpack vtk_output, vtk_folder = params
+  @unpack vtk_output, vtk_folder, Δtout = params
   vtk_output && writevtk(Ω,datadir("sims","test","sol_DB2D_0.vtu"),cellfields=["u"=>xₕ₀[1],"h"=>xₕ₀[2]])
 
   # Solution
@@ -160,12 +160,13 @@ function main(ranks,params::DamBreak_building_params)
   # Iterate over time
   @unpack T = params.ode_solver_params
   tout = 0.0
-  Δtout = 0.05
-  createpvd(ranks,datadir("sims",vtk_folder,"sol_DB2D")) do pvd
+  createpvd(ranks,"sol_DB2D") do pvd
     for (t,(uₕ,hₕ)) in xₕₜ
-      println("Time: $t / $T")
+      if i_am_main(ranks)
+        println("Time: $t / $T")
+      end
       if t >= tout
-        vtk_output && (pvd[t] = createvtk(Ω,datadir("sims",vtk_folder,"sol_DB2D_$(t).vtu"),cellfields=["u"=>uₕ,"h"=>hₕ],order=order))
+        vtk_output && (pvd[t] = createvtk(Ω,"sol_DB2D_$(t)",cellfields=["u"=>uₕ,"h"=>hₕ],order=order))
         tout += Δtout
       end
     end
