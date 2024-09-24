@@ -115,55 +115,7 @@ function get_forms(measures,normals,D,::Val{:ASGS},
   ode_solver_params::ODE_solver_params)
 
   @unpack ν,Cd,g,h₀⬇ = physics_params
-  if D==1
-    I = TensorValue(1.0)
-  elseif D==2
-    I = TensorValue(1.0,0.0,0.0,1.0)
-  end
-
-  # Auxiliar functions
-  absᵤ(u) = (u⋅u + 1.0e-8).^(1/2)
-  convᵤ(a,∇u,v) = (a⋅∇u)⋅v
-  strs(∇u,∇v) = ( ν*(∇u+∇u') - 2/3*ν*tr(∇u)*I) ⊙ ∇v
-  drag(u,h,v) = Cd/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
-  grad(∇h,v) = g*(∇h⋅v)
-  convₕ(u,h,∇u,∇h,w) = ((u⋅∇h) + (h+h₀⬇)*tr(∇u))*w
-
-  # Stabilization
-  c₁ = 12.0; c₂ = 2.0; c₃ = 1.0
-  Rₕ(u,h,hₜ,∇u,∇h) = hₜ + u⋅∇h + (h+h₀⬇)*(tr(∇u))
-  Rᵤ(u,h,uₜ,∇u,∇h) = uₜ + u⋅∇u + g*∇h + Cd/(h+h₀⬇)*(absᵤ(u))*u
-  Lᵤᵃ(u,∇v,∇w) = - u⋅∇v - g*∇w
-  Lₕᵃ(u,h,∇v,∇w) = - u⋅∇w - (h+h₀⬇)*(tr(∇v))
-  τᵤ(a,h,Δx₀) = 1.0 / ((c₁*ν / (Δx₀^2)) + (c₂*absᵤ(a) / Δx₀) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8)))
-  τₕ(a,h,Δx₀) = (Δx₀^2)/(c₁*τᵤ(a,h,Δx₀))
-  stabₕ(u,h,hₜ,∇u,∇h,∇v,∇w,Δx₀) = (τₕ∘(u,h,Δx₀))*((Rₕ∘(u,h,hₜ,∇u,∇h))*Lₕᵃ(u,h,∇v,∇w))
-  stabᵤ(u,h,uₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ∘(u,h,Δx₀))*((Rᵤ∘(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w))
-
-  dΩ,dΓwall, = measures
-  nwall, = normals
-  Ω = get_triangulation(dΩ.quad)
-  Δx₀ = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
-
-  # Residual form
-  res(t,(u,h),(v,w)) = ∫( ∂t(u)⋅v + ∂t(h)*w +
-                        (convᵤ∘(u,∇(u),v)) +
-                        (strs∘(∇(u),∇(v))) +
-                        (drag∘(u,h,v)) +
-                        (grad∘(∇(h),v)) +
-                        (convₕ∘(u,h,∇(u),∇(h),w)) -
-                        (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δxₒ)) )dΩ#-
-                        # (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δxₒ)) )dΩ
-
-  return nothing,nothing,res
-
-end
-
-function get_forms(measures::Tuple{Vararg{GridapDistributed.DistributedMeasure}},normals,D,::Val{:ASGS},
-  physics_params::physics_params,
-  ode_solver_params::ODE_solver_params)
-
-  @unpack ν,Cd,g,h₀⬇ = physics_params
+  @unpack Δt = ode_solver_params
   if D==1
     I = TensorValue(1.0)
   elseif D==2
@@ -186,13 +138,98 @@ function get_forms(measures::Tuple{Vararg{GridapDistributed.DistributedMeasure}}
   c₁ = 12.0; c₂ = 2.0; c₃ = 1.0
   Rₕ(u,h,hₜ,∇u,∇h) = hₜ + u⋅∇h + (h+h₀⬇)*(tr(∇u))
   Rᵤ(u,h,uₜ,∇u,∇h) = uₜ + u⋅∇u + g*∇h + Cd/(h+h₀⬇)*(absᵤ(u))*u
-  Lᵤᵃ(u,∇v,∇w) = - u⋅∇v - g*∇w
+  Lᵤᵃ(u,∇v,∇w) = - u⋅∇v #- g*∇w
   Lₕᵃ(u,h,∇v,∇w) = - u⋅∇w - (h+h₀⬇)*(tr(∇v))
-  τᵤinv(a,h,Δx₀) = (c₁*ν / (Δx₀*Δx₀)) + (c₂*absᵤ(a) / Δx₀) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8))
+  τᵤinv(a,h,Δx₀) = 1.0/Δt + (c₁*ν / (Δx₀*Δx₀)) + (c₂*absᵤ(a) / Δx₀) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8))
   τᵤ(a,h,Δx₀) = 1.0 / τᵤinv(a,h,Δx₀)
   τₕ(a,h,Δx₀) = (Δx₀^2)/(c₁*τᵤ(a,h,Δx₀))
-  stabₕ(u,h,hₜ,∇u,∇h,∇v,∇w,Δx₀) = (τₕ(u,h,Δx₀))*((Rₕ(u,h,hₜ,∇u,∇h))*Lₕᵃ(u,h,∇v,∇w))
-  stabᵤ(u,h,uₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ(u,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w))
+  stabₕ(u,h,hₜ,∇u,∇h,∇v,∇w,Δx₀) = (τₕ∘(u,h,Δx₀))*((Rₕ∘(u,h,hₜ,∇u,∇h))*Lₕᵃ(u,h,∇v,∇w))
+  stabᵤ(u,h,uₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ∘(u,h,Δx₀))*((Rᵤ∘(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w))
+  dustabᵤ(u,du,h,uₜ,∇u,∇du,∇h,∇v,∇w,Δx₀) =
+    (duτᵤ(u,du,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
+    (τᵤ(u,h,Δx₀))*((duRᵤ(u,du,h,uₜ,∇u,∇du,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
+    (τᵤ(u,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅duLᵤᵃ(du,∇v,∇w))
+  dhstabᵤ(u,h,dh,uₜ,∇u,∇h,∇dh,∇v,∇w,Δx₀) =
+    (dhτᵤ(u,h,dh,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
+    (τᵤ(u,h,Δx₀))*((dhRᵤ(u,h,dh,uₜ,∇u,∇dh))⋅Lᵤᵃ(u,∇v,∇w))
+  duₜstabᵤ(u,h,duₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ(u,h,Δx₀))*((duₜRᵤ(duₜ))⋅Lᵤᵃ(u,∇v,∇w))
+  duτᵤ(a,da,h,Δx₀) = -1.0 / (τᵤinv(a,h,Δx₀)*τᵤinv(a,h,Δx₀)) * duτᵤinv(a,da,h,Δx₀)
+  duτᵤinv(a,da,h,Δx₀) = (c₂*duabsᵤ(a,da) / Δx₀) + (c₃*Cd*g*duabsᵤ(a,da) / (h+1.0e-8))
+  dhτᵤ(a,h,dh,Δx₀) = -1.0 / (τᵤinv(a,h,Δx₀)*τᵤinv(a,h,Δx₀)) * dhτᵤinv(a,h,dh,Δx₀)
+  dhτᵤinv(a,h,dh,Δx₀) = -1.0*(c₃*Cd*g*absᵤ(a) / ((h+1.0e-8)*(h+1.0e-8))) * dh
+  duRᵤ(u,du,h,uₜ,∇u,∇du,∇h) = u⋅∇du + du⋅∇u + Cd/(h+h₀⬇)*(duabsᵤ(u,du))*u + Cd/(h+h₀⬇)*(absᵤ(u))*du
+  duLᵤᵃ(du,∇v,∇w) = - du⋅∇v
+  dhRᵤ(u,h,dh,uₜ,∇u,∇dh) = g*∇dh - Cd/((h+h₀⬇)*(h+h₀⬇))*(absᵤ(u))*u *dh
+  duₜRᵤ(duₜ) = duₜ
+
+  dΩ,dΓwall, = measures
+  nwall, = normals
+  Ω = get_triangulation(dΩ.quad)
+  Δx₀ = CellField(lazy_map(dx->dx^(1/D),get_cell_measure(Ω)),Ω)
+
+  # Residual form
+  res(t,(u,h),(v,w)) = ∫( ∂t(u)⋅v + ∂t(h)*w )dΩ +
+                       ∫( (convᵤ∘(u,∇(u),v)) )dΩ +
+                       ∫( (strs∘(∇(u),∇(v))) )dΩ +
+                       ∫( (drag∘(u,h,v)) )dΩ +
+                       ∫( (grad∘(∇(h),v)) )dΩ +
+                       ∫( (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ -
+                       ∫( (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ #-
+                      #  ∫( (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ
+  jac(t,(u,h),(du,dh),(v,w)) =
+                       ∫( (convᵤ(du,∇(u),v))  )dΩ +
+                       ∫( (convᵤ(u,∇(du),v)) )dΩ +
+                       ∫( (strs(∇(du),∇(v))) )dΩ +
+                       ∫( (dudrag(u,du,h,v)) )dΩ +
+                       ∫( (dhdrag(u,h,dh,v)) )dΩ +
+                       ∫( (grad(∇(dh),v)) )dΩ +
+                       ∫( (convₕ(du,h,∇(du),∇(h),w)) )dΩ +
+                       ∫( (dhconvₕ(u,dh,∇(u),∇(dh),w)) )dΩ -
+                       ∫( (dustabᵤ(u,du,h,∂t(u),∇(u),∇(du),∇(h),∇(v),∇(w),Δx₀)) )dΩ -
+                       ∫( (dhstabᵤ(u,h,dh,∂t(u),∇(u),∇(h),∇(dh),∇(v),∇(w),Δx₀)) )dΩ
+  jac_t(t,(u,h),(duₜ,dhₜ),(v,w)) =
+    ∫( duₜ⋅v + dhₜ*w )dΩ -
+    ∫( (duₜstabᵤ(u,h,duₜ,∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ
+
+  return nothing,nothing,res,(jac,jac_t)
+
+end
+
+function get_forms(measures::Tuple{Vararg{GridapDistributed.DistributedMeasure}},normals,D,::Val{:ASGS},
+  physics_params::physics_params,
+  ode_solver_params::ODE_solver_params)
+
+  @unpack ν,Cd,g,h₀⬇ = physics_params
+  @unpack Δt = ode_solver_params
+  if D==1
+    I = TensorValue(1.0)
+  elseif D==2
+    I = TensorValue(1.0,0.0,0.0,1.0)
+  end
+
+  # Auxiliar functions
+  absᵤ(u) = (u⋅u + 1.0e-8).^(1/2)
+  convᵤ(a,∇u,v) = (a⋅∇u)⋅v
+  strs(∇u,∇v) = ( ν*(∇u+∇u') - 2/3*ν*tr(∇u)*I) ⊙ ∇v
+  drag(u,h,v) = Cd/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
+  grad(∇h,v) = g*(∇h⋅v)
+  convₕ(u,h,∇u,∇h,w) = ((u⋅∇h) + (h+h₀⬇)*tr(∇u))*w
+  dudrag(u,du,h,v) = Cd/(h+h₀⬇)*((duabsᵤ(u,du))*(u⋅v)+(absᵤ(u))*(du⋅v))
+  dhdrag(u,h,dh,v) = -Cd/((h+h₀⬇)*(h+h₀⬇))*(absᵤ(u))*(u⋅v)*dh
+  dhconvₕ(u,dh,∇u,∇dh,w) = ((u⋅∇dh) + (dh)*tr(∇u))*w
+  duabsᵤ(u,du) = 1.0 / (u⋅u + 1.0e-8).^(1/2) * (u⋅du)
+
+  # Stabilization
+  c₁ = 12.0; c₂ = 2.0; c₃ = 1.0
+  Rₕ(u,h,hₜ,∇u,∇h) = hₜ + u⋅∇h + (h+h₀⬇)*(tr(∇u))
+  Rᵤ(u,h,uₜ,∇u,∇h) = uₜ + u⋅∇u + g*∇h + Cd/(h+h₀⬇)*(absᵤ(u))*u
+  Lᵤᵃ(u,∇v,∇w) = - u⋅∇v #- g*∇w
+  Lₕᵃ(u,h,∇v,∇w) = - u⋅∇w - (h+h₀⬇)*(tr(∇v))
+  τᵤinv(a,h,Δx₀) = 1.0/Δt + (c₁*ν / (Δx₀*Δx₀)) + (c₂*absᵤ(a) / Δx₀) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8))
+  τᵤ(a,h,Δx₀) = 1.0 / τᵤinv(a,h,Δx₀)
+  τₕ(a,h,Δx₀) = (Δx₀^2)/(c₁*τᵤ(a,h,Δx₀))
+  stabₕ(u,h,hₜ,∇u,∇h,∇v,∇w,Δx₀) = (τₕ∘(u,h,Δx₀))*((Rₕ∘(u,h,hₜ,∇u,∇h))*Lₕᵃ(u,h,∇v,∇w))
+  stabᵤ(u,h,uₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ∘(u,h,Δx₀))*((Rᵤ∘(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w))
   dustabᵤ(u,du,h,uₜ,∇u,∇du,∇h,∇v,∇w,Δx₀) =
     (duτᵤ(u,du,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
     (τᵤ(u,h,Δx₀))*((duRᵤ(u,du,h,uₜ,∇u,∇du,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
@@ -236,11 +273,11 @@ function get_forms(measures::Tuple{Vararg{GridapDistributed.DistributedMeasure}}
     ∫( (dhdrag(u,h,dh,v)) )dΩ +
     ∫( (grad(∇(dh),v)) )dΩ +
     ∫( (convₕ(du,h,∇(du),∇(h),w)) )dΩ +
-    ∫( (dhconvₕ(u,dh,∇(u),∇(dh),w)) )dΩ +
-    ∫( (dustabᵤ(u,du,h,∂t(u),∇(u),∇(du),∇(h),∇(v),∇(w),Δx₀)) )dΩ +
+    ∫( (dhconvₕ(u,dh,∇(u),∇(dh),w)) )dΩ -
+    ∫( (dustabᵤ(u,du,h,∂t(u),∇(u),∇(du),∇(h),∇(v),∇(w),Δx₀)) )dΩ -
     ∫( (dhstabᵤ(u,h,dh,∂t(u),∇(u),∇(h),∇(dh),∇(v),∇(w),Δx₀)) )dΩ
   jac_t(t,(u,h),(duₜ,dhₜ),(v,w)) =
-    m(t,(duₜ,dhₜ),(v,w)) +
+    m(t,(duₜ,dhₜ),(v,w)) -
     ∫( (duₜstabᵤ(u,h,duₜ,∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ
 
   return m,a,res,jac,jac_t
@@ -514,6 +551,7 @@ function get_FEOperator(forms,X,Y,::Union{Val{:Galerkin},Val{:Smagorinsky},Val{:
   return TransientSemilinearFEOperator(m,a,X,Y)
 end
 function get_FEOperator(forms,X,Y,::Union{Val{:ASGS},Val{:conservative_Galerkin}})
-  _,_,res = forms
+  _,_,res,jacs = forms
+  # return TransientFEOperator(res,jacs,X,Y)
   return TransientFEOperator(res,X,Y)
 end

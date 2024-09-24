@@ -51,7 +51,7 @@ params_1D_ASGS = DamBreakSW.DamBreak_benchmark_1D_params(
   verbose=true,
   vtk_output=true,
   vtk_folder="DamBreak_benchmark_1D_ASGS",
-  ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;T=60.0,ρ∞=0.0)
+  ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;T=10.0,ρ∞=0.0)
 )
 params_1D_Smagorinsky = DamBreakSW.DamBreak_benchmark_1D_params(
   nₓ=400,

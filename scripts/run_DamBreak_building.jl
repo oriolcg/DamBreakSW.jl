@@ -53,7 +53,7 @@ params_medium_2D_ASGS = DamBreakSW.DamBreak_building_params(
   Δtout = 0.0,
   vtk_folder="DamBreak_building_0.0_medium_ASGS",
   formulation=:ASGS,
-  ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0,T=0.05,Δt=0.01)
+  ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0,T=1.0,Δt=0.01)
   # ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3;T=30.0,Δt=0.001)
 )
 # @timeit to "Medium" DamBreakSW.main(params_medium_2D)
