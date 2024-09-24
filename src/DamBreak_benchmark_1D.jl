@@ -50,7 +50,7 @@ function main(params::DamBreak_benchmark_1D_params)
 
   # Define spaces
   @unpack order, formulation = params
-  X,Y = get_FESpaces(Ω,order,["boundary"],[(true,)],[u₀],Val(formulation))
+  X,Y = get_FESpaces(Ω,1,order,["boundary"],[(true,)],[u₀],Val(formulation))
 
   # Integration Measure
   dΩ = Measure(Ω,2*order)
@@ -62,8 +62,8 @@ function main(params::DamBreak_benchmark_1D_params)
 
   # Weak form
   @unpack ode_solver_params = params
-  m,a,res = get_forms(measures,normals,1,Val(formulation), physics_params, ode_solver_params)
-  op = TransientSemilinearFEOperator(m,a,X,Y)
+  forms = get_forms(measures,normals,1,Val(formulation), physics_params, ode_solver_params)
+  op = get_FEOperator(forms,X,Y,Val(formulation))
 
   # Solver
   ls = LUSolver()
