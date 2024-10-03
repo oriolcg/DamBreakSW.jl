@@ -156,28 +156,30 @@ function get_forms(measures,normals,D,::Val{:ASGS},
   Rₕ(u,h,hₜ,∇u,∇h) = hₜ + u⋅∇h + (h+h₀⬇)*(tr(∇u))
   Rᵤ(u,h,uₜ,∇u,∇h) = uₜ + u⋅∇u + g*∇h + Cd/(h+h₀⬇)*(absᵤ(u))*u
   Lᵤᵃ(u,∇v,∇w) = - u⋅∇v #- g*∇w
-  Lₕᵃ(u,h,∇v,∇w) = - u⋅∇w - (h+h₀⬇)*(tr(∇v))
-  τᵤinv(a,h,Δx₀) = 1.0/Δt + (c₁*ν / (Δx₀*Δx₀)) + (c₂*absᵤ(a) / Δx₀) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8))
+  Lₕᵃ(u,h,∇v,∇w) = - u⋅∇w - (h₀⬇)*(tr(∇v))#(h+h₀⬇)*(tr(∇v))
+  τᵤinv(a,h,Δx₀) = 2/Δt + (c₁*ν / (Δx₀*Δx₀)) + (c₂*absᵤ(a) / Δx₀) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8))
   τᵤ(a,h,Δx₀) = 1.0 / τᵤinv(a,h,Δx₀)
-  τₕ(a,h,Δx₀) = (Δx₀^2)/(c₁*τᵤ(a,h,Δx₀))
+  # τᵤ₂ = Δt/2
+  # τᵤ(a,h,Δx₀) = 1.0 / (1.0/τᵤinv(a,h,Δx₀) + 1.0/τᵤ₂)
+  τₕ(a,h,Δx₀) = τᵤ(a,h,Δx₀)#(Δx₀^2)/(c₁*τᵤ(a,h,Δx₀))
   stabₕ(u,h,hₜ,∇u,∇h,∇v,∇w,Δx₀) = (τₕ∘(u,h,Δx₀))*((Rₕ∘(u,h,hₜ,∇u,∇h))*Lₕᵃ(u,h,∇v,∇w))
   stabᵤ(u,h,uₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ∘(u,h,Δx₀))*((Rᵤ∘(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w))
-  dustabᵤ(u,du,h,uₜ,∇u,∇du,∇h,∇v,∇w,Δx₀) =
-    (duτᵤ(u,du,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
-    (τᵤ(u,h,Δx₀))*((duRᵤ(u,du,h,uₜ,∇u,∇du,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
-    (τᵤ(u,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅duLᵤᵃ(du,∇v,∇w))
-  dhstabᵤ(u,h,dh,uₜ,∇u,∇h,∇dh,∇v,∇w,Δx₀) =
-    (dhτᵤ(u,h,dh,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
-    (τᵤ(u,h,Δx₀))*((dhRᵤ(u,h,dh,uₜ,∇u,∇dh))⋅Lᵤᵃ(u,∇v,∇w))
-  duₜstabᵤ(u,h,duₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ(u,h,Δx₀))*((duₜRᵤ(duₜ))⋅Lᵤᵃ(u,∇v,∇w))
-  duτᵤ(a,da,h,Δx₀) = -1.0 / (τᵤinv(a,h,Δx₀)*τᵤinv(a,h,Δx₀)) * duτᵤinv(a,da,h,Δx₀)
-  duτᵤinv(a,da,h,Δx₀) = (c₂*duabsᵤ(a,da) / Δx₀) + (c₃*Cd*g*duabsᵤ(a,da) / (h+1.0e-8))
-  dhτᵤ(a,h,dh,Δx₀) = -1.0 / (τᵤinv(a,h,Δx₀)*τᵤinv(a,h,Δx₀)) * dhτᵤinv(a,h,dh,Δx₀)
-  dhτᵤinv(a,h,dh,Δx₀) = -1.0*(c₃*Cd*g*absᵤ(a) / ((h+1.0e-8)*(h+1.0e-8))) * dh
-  duRᵤ(u,du,h,uₜ,∇u,∇du,∇h) = u⋅∇du + du⋅∇u + Cd/(h+h₀⬇)*(duabsᵤ(u,du))*u + Cd/(h+h₀⬇)*(absᵤ(u))*du
-  duLᵤᵃ(du,∇v,∇w) = - du⋅∇v
-  dhRᵤ(u,h,dh,uₜ,∇u,∇dh) = g*∇dh - Cd/((h+h₀⬇)*(h+h₀⬇))*(absᵤ(u))*u *dh
-  duₜRᵤ(duₜ) = duₜ
+  # dustabᵤ(u,du,h,uₜ,∇u,∇du,∇h,∇v,∇w,Δx₀) =
+  #   (duτᵤ(u,du,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
+  #   (τᵤ(u,h,Δx₀))*((duRᵤ(u,du,h,uₜ,∇u,∇du,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
+  #   (τᵤ(u,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅duLᵤᵃ(du,∇v,∇w))
+  # dhstabᵤ(u,h,dh,uₜ,∇u,∇h,∇dh,∇v,∇w,Δx₀) =
+  #   (dhτᵤ(u,h,dh,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
+  #   (τᵤ(u,h,Δx₀))*((dhRᵤ(u,h,dh,uₜ,∇u,∇dh))⋅Lᵤᵃ(u,∇v,∇w))
+  # duₜstabᵤ(u,h,duₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ(u,h,Δx₀))*((duₜRᵤ(duₜ))⋅Lᵤᵃ(u,∇v,∇w))
+  # duτᵤ(a,da,h,Δx₀) = -1.0 / (τᵤinv(a,h,Δx₀)*τᵤinv(a,h,Δx₀)) * duτᵤinv(a,da,h,Δx₀)
+  # duτᵤinv(a,da,h,Δx₀) = (c₂*duabsᵤ(a,da) / Δx₀) + (c₃*Cd*g*duabsᵤ(a,da) / (h+1.0e-8))
+  # dhτᵤ(a,h,dh,Δx₀) = -1.0 / (τᵤinv(a,h,Δx₀)*τᵤinv(a,h,Δx₀)) * dhτᵤinv(a,h,dh,Δx₀)
+  # dhτᵤinv(a,h,dh,Δx₀) = -1.0*(c₃*Cd*g*absᵤ(a) / ((h+1.0e-8)*(h+1.0e-8))) * dh
+  # duRᵤ(u,du,h,uₜ,∇u,∇du,∇h) = u⋅∇du + du⋅∇u + Cd/(h+h₀⬇)*(duabsᵤ(u,du))*u + Cd/(h+h₀⬇)*(absᵤ(u))*du
+  # duLᵤᵃ(du,∇v,∇w) = - du⋅∇v
+  # dhRᵤ(u,h,dh,uₜ,∇u,∇dh) = g*∇dh - Cd/((h+h₀⬇)*(h+h₀⬇))*(absᵤ(u))*u *dh
+  # duₜRᵤ(duₜ) = duₜ
 
   dΩ,dΓwall, = measures
   nwall, = normals
@@ -193,22 +195,22 @@ function get_forms(measures,normals,D,::Val{:ASGS},
                        ∫( (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ -
                        ∫( (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ #-
                       #  ∫( (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ
-  jac(t,(u,h),(du,dh),(v,w)) =
-                       ∫( (convᵤ(du,∇(u),v))  )dΩ +
-                       ∫( (convᵤ(u,∇(du),v)) )dΩ +
-                       ∫( (strs(∇(du),∇(v))) )dΩ +
-                       ∫( (dudrag(u,du,h,v)) )dΩ +
-                       ∫( (dhdrag(u,h,dh,v)) )dΩ +
-                       ∫( (grad(∇(dh),v)) )dΩ +
-                       ∫( (convₕ(du,h,∇(du),∇(h),w)) )dΩ +
-                       ∫( (dhconvₕ(u,dh,∇(u),∇(dh),w)) )dΩ -
-                       ∫( (dustabᵤ(u,du,h,∂t(u),∇(u),∇(du),∇(h),∇(v),∇(w),Δx₀)) )dΩ -
-                       ∫( (dhstabᵤ(u,h,dh,∂t(u),∇(u),∇(h),∇(dh),∇(v),∇(w),Δx₀)) )dΩ
-  jac_t(t,(u,h),(duₜ,dhₜ),(v,w)) =
-    ∫( duₜ⋅v + dhₜ*w )dΩ -
-    ∫( (duₜstabᵤ(u,h,duₜ,∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ
+  # jac(t,(u,h),(du,dh),(v,w)) =
+  #                      ∫( (convᵤ(du,∇(u),v))  )dΩ +
+  #                      ∫( (convᵤ(u,∇(du),v)) )dΩ +
+  #                      ∫( (strs(∇(du),∇(v))) )dΩ +
+  #                      ∫( (dudrag(u,du,h,v)) )dΩ +
+  #                      ∫( (dhdrag(u,h,dh,v)) )dΩ +
+  #                      ∫( (grad(∇(dh),v)) )dΩ +
+  #                      ∫( (convₕ(du,h,∇(du),∇(h),w)) )dΩ +
+  #                      ∫( (dhconvₕ(u,dh,∇(u),∇(dh),w)) )dΩ -
+  #                      ∫( (dustabᵤ(u,du,h,∂t(u),∇(u),∇(du),∇(h),∇(v),∇(w),Δx₀)) )dΩ -
+  #                      ∫( (dhstabᵤ(u,h,dh,∂t(u),∇(u),∇(h),∇(dh),∇(v),∇(w),Δx₀)) )dΩ
+  # jac_t(t,(u,h),(duₜ,dhₜ),(v,w)) =
+  #   ∫( duₜ⋅v + dhₜ*w )dΩ -
+  #   ∫( (duₜstabᵤ(u,h,duₜ,∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ
 
-  return nothing,nothing,res,(jac,jac_t)
+  return nothing,nothing,res#,(jac,jac_t)
 
 end
 
@@ -319,13 +321,21 @@ function get_forms(measures,normals,D,::Val{:Smagorinsky},
 
   # Auxiliar functions
   cₛ = 0.164
-  νₜ(εᵤ,Δx₀) = (cₛ*Δx₀)^2*(√(2*(εᵤ⊙εᵤ)+1.0e-8 ))
-  absᵤ(u) = √(u⋅u + 1.0e-8)
+  νₜ(εᵤ,Δx₀) = (cₛ^2*(Δx₀*Δx₀))*(√(2*(εᵤ⊙εᵤ)+1.0e-8 ))
+  absᵤ(u) = (u⋅u + 1.0e-8).^(1/2)
   convᵤ(a,∇u,v) = (a⋅∇u)⋅v
-  strs(∇u,∇v,εᵤ,Δx₀) = ( (ν+νₜ(εᵤ,Δx₀))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,Δx₀))*tr(∇u)*I) ⊙ ∇v
-  drag(u,h,v) = Cd/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
+  # strs(∇u,∇v,εᵤ,Δx₀) = ( (ν+νₜ(εᵤ,Δx₀))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,Δx₀))*tr(∇u)*I) ⊙ ∇v
+  strs(ν,∇u,∇v) = ( (ν)*(∇u+∇u') - 2/3*(ν)*tr(∇u)*I) ⊙ ∇v
+  drag(u,h,v) = Cd^2/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
   grad(∇h,v) = g*(v⋅∇h)
   convₕ(u,h,∇u,∇h,w) = ((u⋅∇h) + (h+h₀⬇)*tr(∇u))*w
+
+  # Derivatives
+  dabsᵤ(u,du) = 1/absᵤ(u)*(du⋅u)
+  dudrag(u,du,h,v) = Cd^2/(h+h₀⬇)*((dabsᵤ(u,du))*(u⋅v)+(absᵤ(u))*(du⋅v))
+  dhdrag(u,h,dh,v) = -Cd^2/((h+h₀⬇)*(h+h₀⬇))*(absᵤ(u))*(u⋅v)*dh
+  dhconvₕ(u,dh,∇u,∇dh,w) = ((u⋅∇dh) + (dh)*tr(∇u))*w
+  νₜ(εᵤ,εdu,Δx₀) = (cₛ^2*Δx₀*Δx₀)/((2*(εᵤ⊙εᵤ)+1.0e-8 ).^(1/2 ))*(2*(εdu⊙εᵤ))
 
   dΩ,dΓwall, = measures
   nwall, = normals
@@ -335,13 +345,27 @@ function get_forms(measures,normals,D,::Val{:Smagorinsky},
   # Residual form
   m(t,(uₜ,hₜ),(v,w)) = ∫(uₜ⋅v + hₜ*w)dΩ
   a(t,(u,h),(v,w)) = ∫( (convᵤ∘(u,∇(u),v)) +
-                        (strs∘(∇(u),∇(v),ε(u),Δx₀)) +
+                        # (strs∘(∇(u),∇(v),ε(u),Δx₀)) +
                         (drag∘(u,h,v)) +
                         (grad∘(∇(h),v)) +
-                        (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ
+                        (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ +
+                     ∫( (strs(ν,∇(u),∇(v))) )dΩ +
+                     ∫( (strs(νₜ∘(ε(u),Δx₀),∇(u),∇(v))) )dΩ
   res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
+  jac(t,(u,h),(du,dh),(v,w)) =
+    ∫( (convᵤ(du,∇(u),v))  )dΩ +
+    ∫( (convᵤ(u,∇(du),v)) )dΩ +
+    ∫( (strs(ν,∇(du),∇(v))) )dΩ +
+    ∫( (strs(νₜ∘(ε(u),Δx₀),∇(du),∇(v))) )dΩ +
+    ∫( (strs(νₜ∘(ε(u),ε(du),Δx₀),∇(u),∇(v))) )dΩ +
+    ∫( (dudrag(u,du,h,v)) )dΩ +
+    ∫( (dhdrag(u,h,dh,v)) )dΩ +
+    ∫( (grad(∇(dh),v)) )dΩ +
+    ∫( (convₕ(du,h,∇(du),∇(h),w)) )dΩ +
+    ∫( (dhconvₕ(u,dh,∇(u),∇(dh),w)) )dΩ
+  jac_t(t,(uₜ,hₜ),(duₜ,dhₜ),(v,w)) = m(t,(duₜ,dhₜ),(v,w))
 
-  return m,a,res
+  return m,a,res,(jac,jac_t)
 
 end
 
@@ -363,53 +387,43 @@ function get_forms(measures::Tuple{Vararg{GridapDistributed.DistributedMeasure}}
 
   # Auxiliar functions
   cₛ = 0.164
-  # νₜ(εᵤ,Δx₀) = (cₛ*Δx₀)^2*(√(2*(εᵤ⊙εᵤ)+1.0e-8 ))
-  νₜ(εᵤ) = ((2*(εᵤ⊙εᵤ)+1.0e-8 ).^(1/2))
+  νₜ(εᵤ,Δx₀) = (cₛ^2*(Δx₀*Δx₀))*(√(2*(εᵤ⊙εᵤ)+1.0e-8 ))
   absᵤ(u) = (u⋅u + 1.0e-8).^(1/2)
-  dabsᵤ(u,du) = 1/absᵤ(u)*(du⋅u)
   convᵤ(a,∇u,v) = (a⋅∇u)⋅v
-  strs(∇u,∇v,εᵤ,Δx₀) = ( (ν+νₜ(εᵤ,Δx₀))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,Δx₀))*tr(∇u)*I) ⊙ ∇v
-  # strs(∇u,∇v,εᵤ) = ( (ν+νₜ(εᵤ,0.1))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,0.1))*tr(∇u)*I) ⊙ ∇v
+  # strs(∇u,∇v,εᵤ,Δx₀) = ( (ν+νₜ(εᵤ,Δx₀))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,Δx₀))*tr(∇u)*I) ⊙ ∇v
   strs(ν,∇u,∇v) = ( (ν)*(∇u+∇u') - 2/3*(ν)*tr(∇u)*I) ⊙ ∇v
-  strs(∇u,∇v) = ( (ν)*(∇u+∇u') - 2/3*(ν)*tr(∇u)*I) ⊙ ∇v
-  drag(u,h,v) = Cd/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
-  dudrag(u,du,h,v) = Cd/(h+h₀⬇)*((dabsᵤ(u,du))*(u⋅v)+(absᵤ(u))*(du⋅v))
-  dhdrag(u,h,dh,v) = -Cd/((h+h₀⬇)*(h+h₀⬇))*(absᵤ(u))*(u⋅v)*dh
+  drag(u,h,v) = Cd^2/(h+h₀⬇)*(absᵤ(u))*(u⋅v)
   grad(∇h,v) = g*(v⋅∇h)
   convₕ(u,h,∇u,∇h,w) = ((u⋅∇h) + (h+h₀⬇)*tr(∇u))*w
-  dhconvₕ(u,dh,∇u,∇dh,w) = ((u⋅∇dh) + (dh)*tr(∇u))*w
 
-  # strs(∇u,∇v,εᵤ,Δx₀) = ( (ν+νₜ(εᵤ,Δx₀))*(∇u+∇u') - 2/3*(ν+νₜ(εᵤ,Δx₀))*tr(∇u)*I) ⊙ ∇v
-  # dstrs(∇u,∇du,∇v,εᵤ,εdu,Δx₀) = ( (ν+νₜ(εᵤ,0.1))*(∇du+∇du') - 2/3*(ν+νₜ(εᵤ,0.1))*tr(∇du)*I) ⊙ ∇v +
-  # ( (νₜ(εᵤ,εdu,Δx₀))*(∇u+∇u') - 2/3*(νₜ(εᵤ,εdu,Δx₀))*tr(∇u)*I) ⊙ ∇v
-  νₜ(εᵤ,εdu) = 1/((2*(εᵤ⊙εᵤ)+1.0e-8 ).^(1/2 ))*(4*(εdu⊙εᵤ))
+  # Derivatives
+  dabsᵤ(u,du) = 1/absᵤ(u)*(du⋅u)
+  dudrag(u,du,h,v) = Cd^2/(h+h₀⬇)*((dabsᵤ(u,du))*(u⋅v)+(absᵤ(u))*(du⋅v))
+  dhdrag(u,h,dh,v) = -Cd^2/((h+h₀⬇)*(h+h₀⬇))*(absᵤ(u))*(u⋅v)*dh
+  dhconvₕ(u,dh,∇u,∇dh,w) = ((u⋅∇dh) + (dh)*tr(∇u))*w
+  νₜ(εᵤ,εdu,Δx₀) = (cₛ^2*Δx₀*Δx₀)/((2*(εᵤ⊙εᵤ)+1.0e-8 ).^(1/2 ))*(2*(εdu⊙εᵤ))
 
   dΩ,dΓwall, = measures
   nwall, = normals
   Ω = dΩ.trian
-  # Δx₀2 = map(Ω.trians) do trian
-  #   lazy_map(dx->dx^(2/D),get_cell_measure(trian))
-  # end
-  Δx₀2 = 0.05^2
+  Δx₀ = CellField(_get_cell_size(Ω),Ω)
 
   # Residual form
   m(t,(uₜ,hₜ),(v,w)) = ∫(uₜ⋅v + hₜ*w)dΩ
   a(t,(u,h),(v,w)) = ∫( (convᵤ∘(u,∇(u),v)) +
                         # (strs∘(∇(u),∇(v),ε(u),Δx₀)) +
-                        # (strs∘(∇(u),∇(v),ε(u))) +
                         (drag∘(u,h,v)) +
                         (grad∘(∇(h),v)) +
                         (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ +
-                        # ∫( (strs(∇(u),∇(v),ε(u),Δx₀)) )dΩ
                      ∫( (strs(ν,∇(u),∇(v))) )dΩ +
-                     ∫( ((cₛ^2*Δx₀2))*(strs(νₜ(ε(u)),∇(u),∇(v))) )dΩ
+                     ∫( (strs(νₜ∘(ε(u),Δx₀),∇(u),∇(v))) )dΩ
   res(t,(u,h),(v,w)) = m(t,(∂t(u),∂t(h)),(v,w)) + a(t,(u,h),(v,w))
   jac(t,(u,h),(du,dh),(v,w)) =
     ∫( (convᵤ(du,∇(u),v))  )dΩ +
     ∫( (convᵤ(u,∇(du),v)) )dΩ +
     ∫( (strs(ν,∇(du),∇(v))) )dΩ +
-    ∫( ((cₛ^2*Δx₀2))*(strs(νₜ(ε(u)),∇(du),∇(v))) )dΩ +
-    ∫( ((cₛ^2*Δx₀2))*(strs(νₜ(ε(u),ε(du)),∇(u),∇(v))) )dΩ +
+    ∫( (strs(νₜ∘(ε(u),Δx₀),∇(du),∇(v))) )dΩ +
+    ∫( (strs(νₜ∘(ε(u),ε(du),Δx₀),∇(u),∇(v))) )dΩ +
     ∫( (dudrag(u,du,h,v)) )dΩ +
     ∫( (dhdrag(u,h,dh,v)) )dΩ +
     ∫( (grad(∇(dh),v)) )dΩ +
@@ -417,7 +431,7 @@ function get_forms(measures::Tuple{Vararg{GridapDistributed.DistributedMeasure}}
     ∫( (dhconvₕ(u,dh,∇(u),∇(dh),w)) )dΩ
   jac_t(t,(uₜ,hₜ),(duₜ,dhₜ),(v,w)) = m(t,(duₜ,dhₜ),(v,w))
 
-  return m,a,res,jac,jac_t
+  return m,a,res,(jac,jac_t)
 
 end
 
@@ -522,14 +536,25 @@ function get_forms(measures,normals,D,::Val{:conservative_Galerkin},
     -ν*u[2]/u[1], ν, 0,
     -2ν*u[3]/u[1], 0, 2ν
   )
+  𝒮(u) = VectorValue(
+    0.0,
+    0.0,#- g*Cd^2*_abs(u)*u[2],#/((u[1] + 1.0e-8)^(1/3)),
+    0.0#- g*Cd^2*_abs(u)*u[3]#/((u[1] + 1.0e-8)^(1/3))
+  )
+  ℋ(u,n) = VectorValue(
+    0,
+    0.5*g*u[1]^2*n[1],
+    0.5*g*u[1]^2*n[2]
+  )
   R(u,∇₁u,∇₂u,εu) = VectorValue(
     0,
     -2ν*(∇₁u[1]*εu[1,1]+∇₂u[1]*εu[1,2]),# + g*Cd*_abs(u)*u[2]/((u[1] + 1.0e-8)^(1/3)),
     -2ν*(∇₁u[1]*εu[2,1]+∇₂u[1]*εu[2,2])# + g*Cd*_abs(u)*u[3]/((u[1] + 1.0e-8)^(1/3))
   )
-  ℛ(u) = ∂t(u) + 𝒵(u) - (R∘(u,∇₁(u),∇₂(u),εᵤ(u))) # only true for 1st order
+  ℛ(u) = ∂t(u) - (𝒮∘u) + ℒ(u) #- (R∘(u,∇₁(u),∇₂(u),εᵤ(u))) # only true for 1st order
   # ℛ(u) = 𝒵(u) - (R∘(u,∇₁(u),∇₂(u),εᵤ(u)))
-  𝒵(u) = (𝒜₁∘u)⋅(∇₁(u)) + (𝒜₂∘u)⋅∇₂(u)
+  ℒ(u) = (𝒜₁∘u)⋅(∇₁(u)) + (𝒜₂∘u)⋅∇₂(u)
+  ℒᵃ(w,u) = ∇₁(w)⋅(𝒜₁∘u) + ∇₂(w)⋅(𝒜₂∘u)
 
   ∇₁(u) = VectorValue(1.0,0.0)⋅∇(u)
   ∇₂(u) = VectorValue(0.0,1.0)⋅∇(u)
@@ -541,21 +566,33 @@ function get_forms(measures,normals,D,::Val{:conservative_Galerkin},
   Ω = get_triangulation(dΩ.quad)
   h = lazy_map(dx->dx^(1/D),get_cell_measure(Ω))
   _abs(u) = √(u[2]^2+u[3]^2 + 1.0e-8)
-  τ(u,h) = 1/(12*ν/h^2)# + 2*_abs(u)/h)
   ∇h(∇u) = ∇u⋅VectorValue(1.0,0.0,0.0)
   _absh(∇h) = √(∇h[1]^2+∇h[2]^2 + 1.0e-8)
   τshoc(u,∇u,h) = h/(2*_abs(u))*(_absh(∇h(∇u))*h/(h₀⬇))
   νshoc(u,∇u,h) = τshoc(u,∇u,h)*_abs(u)^2
 
+  @unpack Δt = ode_solver_params
+  cτ = 0.5
+  # τ = cτ*Δt/2
+  τ(u,h) = 1/(2/(cτ*Δt) + 12*ν/h^2 + 2*_abs(u)/h)
+
   # Residual form
   dΩ,dΓwall, = measures
   nwall, = normals
   # m(t,uₜ,w) = ∫( uₜ⋅w )dΩ
-  res(t,u,w) = ∫( ℛ(u)⋅w +
-                ((𝒦₁₁∘u)⋅(∇₁(u)) + (𝒦₁₂∘u)⋅∇₂(u))⊙(∇₁(w)) +
-                ((𝒦₂₁∘u)⋅(∇₁(u)) + (𝒦₂₂∘u)⋅∇₂(u))⊙(∇₂(w)) +
-                (τ∘(u,h))*((∇₁(w)⋅(𝒜₁∘u) + ∇₂(w)⋅(𝒜₂∘u))⋅ℛ(u)) )dΩ#+
-                # (νshoc∘(u,∇(u),h))*(∇₁(u)⋅∇₁(w) + ∇₂(u)⋅∇₂(w)) )dΩ
+  # res(t,u,w) = ∫( ℛ(u)⋅w +
+  #   ((𝒦₁₁∘u)⋅(∇₁(u)) + (𝒦₁₂∘u)⋅∇₂(u))⊙(∇₁(w)) +
+  #   ((𝒦₂₁∘u)⋅(∇₁(u)) + (𝒦₂₂∘u)⋅∇₂(u))⊙(∇₂(w)) +
+  #   (τ∘(u,h))*((∇₁(w)⋅(𝒜₁∘u) + ∇₂(w)⋅(𝒜₂∘u))⋅ℛ(u)) )dΩ#+
+    # (νshoc∘(u,∇(u),h))*(∇₁(u)⋅∇₁(w) + ∇₂(u)⋅∇₂(w)) )dΩ
+  res(t,u,w) = ∫( w⋅ℛ(u) + ℒᵃ(w,u)⋅((τ∘(u,h))*(ℛ(u))) + (νshoc∘(u,∇(u),h))*(∇₁(u)⋅∇₁(w) + ∇₂(u)⋅∇₂(w)) )dΩ #+
+  # res(t,u,w) = ∫( w⋅ℛ(u) + ℒᵃ(w,u)⋅((τ)*(ℛ(u))) )dΩ#+ (νshoc∘(u,∇(u),h))*(∇₁(u)⋅∇₁(w) + ∇₂(u)⋅∇₂(w)) )dΩ #+
+    # ∫( w⋅(ℋ∘(u,nwall)) )dΓwall
+
+    # ((𝒦₁₁∘u)⋅(∇₁(u)) + (𝒦₁₂∘u)⋅∇₂(u))⊙(∇₁(w)) +
+    # ((𝒦₂₁∘u)⋅(∇₁(u)) + (𝒦₂₂∘u)⋅∇₂(u))⊙(∇₂(w)) +
+    # (τ∘(u,h))*((∇₁(w)⋅(𝒜₁∘u) + ∇₂(w)⋅(𝒜₂∘u))⋅ℛ(u)) )dΩ#+
+  # (νshoc∘(u,∇(u),h))*(∇₁(u)⋅∇₁(w) + ∇₂(u)⋅∇₂(w)) )dΩ
   # res(t,(u,h),(v,w)) = m(t,∂t(u),v) + a(t,u,w)
 
   return nothing,nothing,res
@@ -563,12 +600,17 @@ function get_forms(measures,normals,D,::Val{:conservative_Galerkin},
 end
 
 # FE operator
-function get_FEOperator(forms,X,Y,::Union{Val{:Galerkin},Val{:Smagorinsky},Val{:conservative_Galerkin}})
+function get_FEOperator(forms,X,Y,::Union{Val{:Galerkin}})#,Val{:Smagorinsky}})
   m,a,res = forms
   return TransientSemilinearFEOperator(m,a,X,Y)
 end
 function get_FEOperator(forms,X,Y,::Union{Val{:ASGS},Val{:conservative_Galerkin}})
-  _,_,res,jacs = forms
+  # _,_,res,jacs = forms
+  _,_,res = forms
   # return TransientFEOperator(res,jacs,X,Y)
   return TransientFEOperator(res,X,Y)
+end
+function get_FEOperator(forms,X,Y,::Val{:Smagorinsky})
+  m,a,res,jacs = forms
+  return TransientSemilinearFEOperator(m,a,jacs,X,Y)
 end
