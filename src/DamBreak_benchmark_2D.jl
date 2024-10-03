@@ -72,7 +72,7 @@ function main(params::DamBreak_benchmark_2D_params)
 
   # Solver
   ls = LUSolver()
-  nls = NLSolver(ls,show_trace=verbose,iterations=20,method=:newton)
+  nls = NLSolver(ls,show_trace=verbose,iterations=10,method=:newton)
   odes = get_ode_solver(nls,params.ode_solver_params)
 
   # Initial solution
@@ -103,6 +103,7 @@ function _get_dirichlet_DB_benchmark_2D(::Val{:conservative_Galerkin})
   U₀(x,t) = VectorValue(0.0,0.0,0.0)
   U₀(t) = x->U₀(x,t)
   return ["wall"], [(false,true,true)], [U₀]
+  # return String[], Tuple{Bool}[], Function[]
 end
 
 function _get_initial_solution_DB_benchmark_2D(u₀,h₀,h₀⬇,X,::Union{Val{:Galerkin},Val{:ASGS},Val{:Smagorinsky}})

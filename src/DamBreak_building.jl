@@ -45,7 +45,9 @@ function main(params::DamBreak_building_params)
   # Define initial conditions
   @unpack x₀, physics_params = params
   @unpack h₀⬆, h₀⬇ = physics_params
-  h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
+  ϵ = 0.05
+  h₀(x) = (0.5 * (1 + tanh((x₀-x[1]) / ϵ)))*(h₀⬆-h₀⬇)
+  # h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
 
   # Define spaces
   @unpack order, formulation = params
@@ -69,7 +71,7 @@ function main(params::DamBreak_building_params)
 
   # Solver
   ls = LUSolver()
-  nls = NLSolver(ls,show_trace=verbose,iterations=10,method=:newton,ftol=1.0e-6)
+  nls = NLSolver(ls,show_trace=verbose,iterations=15,method=:newton,ftol=1.0e-6)
   odes = get_ode_solver(nls,params.ode_solver_params)
 
   # Initial solution
@@ -119,7 +121,8 @@ function main(ranks,params::DamBreak_building_params)
   # Define initial conditions
   @unpack x₀, physics_params = params
   @unpack h₀⬆, h₀⬇ = physics_params
-  h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
+  ϵ = 0.05
+  h₀(x) = (0.5 * (1 + tanh((x[1]-x₀) / ϵ)))*(h₀⬆-h₀⬇)#x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
 
   # Define spaces
   @unpack order, formulation = params
