@@ -247,8 +247,8 @@ function get_forms(measures::Tuple{Vararg{GridapDistributed.DistributedMeasure}}
   τᵤinv(a,h,Δx₀) = 1.0/Δt + (c₁*ν / (Δx₀*Δx₀)) + (c₂*absᵤ(a) / Δx₀) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8))
   τᵤ(a,h,Δx₀) = 1.0 / τᵤinv(a,h,Δx₀)
   τₕ(a,h,Δx₀) = (Δx₀^2)/(c₁*τᵤ(a,h,Δx₀))
-  stabₕ(u,h,hₜ,∇u,∇h,∇v,∇w,Δx₀) = (τₕ∘(u,h,Δx₀))*((Rₕ∘(u,h,hₜ,∇u,∇h))*Lₕᵃ(u,h,∇v,∇w))
-  stabᵤ(u,h,uₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ∘(u,h,Δx₀))*((Rᵤ∘(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w))
+  stabₕ(u,h,hₜ,∇u,∇h,∇v,∇w,Δx₀) = (τₕ(u,h,Δx₀))*((Rₕ(u,h,hₜ,∇u,∇h))*Lₕᵃ(u,h,∇v,∇w))
+  stabᵤ(u,h,uₜ,∇u,∇h,∇v,∇w,Δx₀) = (τᵤ(u,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w))
   dustabᵤ(u,du,h,uₜ,∇u,∇du,∇h,∇v,∇w,Δx₀) =
     (duτᵤ(u,du,h,Δx₀))*((Rᵤ(u,h,uₜ,∇u,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +
     (τᵤ(u,h,Δx₀))*((duRᵤ(u,du,h,uₜ,∇u,∇du,∇h))⋅Lᵤᵃ(u,∇v,∇w)) +

@@ -45,7 +45,7 @@ function main(params::DamBreak_building_params)
   # Define initial conditions
   @unpack x₀, physics_params = params
   @unpack h₀⬆, h₀⬇ = physics_params
-  ϵ = 0.05
+  ϵ = 0.1
   h₀(x) = (0.5 * (1 + tanh((x₀-x[1]) / ϵ)))*(h₀⬆-h₀⬇)
   # h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
 
@@ -121,8 +121,8 @@ function main(ranks,params::DamBreak_building_params)
   # Define initial conditions
   @unpack x₀, physics_params = params
   @unpack h₀⬆, h₀⬇ = physics_params
-  ϵ = 0.05
-  h₀(x) = (0.5 * (1 + tanh((x[1]-x₀) / ϵ)))*(h₀⬆-h₀⬇)#x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
+  ϵ = 0.1
+  h₀(x) = (0.5 * (1 + tanh((x₀-x[1]) / ϵ)))*(h₀⬆-h₀⬇)
 
   # Define spaces
   @unpack order, formulation = params
@@ -140,9 +140,8 @@ function main(ranks,params::DamBreak_building_params)
 
   # Weak form
   @unpack ode_solver_params = params
-  m,a,res,jac,jac_t = get_forms(measures,normals,D,Val(formulation), physics_params, ode_solver_params)
-  # op = TransientFEOperator(res,X,Y)
-  op = TransientSemilinearFEOperator(m,a,(jac,jac_t),X,Y)
+  forms = get_forms(measures,normals,D,Val(formulation), physics_params, ode_solver_params)
+  op = get_FEOperator(forms,X,Y,Val(formulation))
 
   # Solver
   # ls = LUSolver()
@@ -151,9 +150,8 @@ function main(ranks,params::DamBreak_building_params)
   odes = get_ode_solver(nls,params.ode_solver_params)
 
   # Initial solution
-  xₕ₀ = interpolate_everywhere([u₀(0),h₀],X)
-  xdotₕ₀ = interpolate_everywhere([VectorValue(0.0,0.0),0.0],X)
-  @unpack vtk_output, vtk_folder = params
+  xₕ₀, xdotₕ₀ = _get_initial_solution_DB_building(u₀,h₀,h₀⬇,X,Val(formulation))
+  @unpack vtk_output, vtk_folder, Δtout = params
   vtk_output && _writevtk_DB_building(Ω,vtk_folder,xₕ₀,Val(formulation))
 
   # Solution
@@ -162,7 +160,6 @@ function main(ranks,params::DamBreak_building_params)
   # Iterate over time
   @unpack T = params.ode_solver_params
   tout = 0.0
-  Δtout = 0.05
   createpvd(ranks,datadir("sims",vtk_folder,"sol_DB2D")) do pvd
     for (t,xₕ) in xₕₜ
       println("Time: $t / $T")
