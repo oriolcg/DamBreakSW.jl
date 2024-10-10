@@ -23,6 +23,7 @@ A structure to store the parameters of the 2D Dam Break benchmark. The parameter
   Δtout::Float64 = 0.05 # Time step for VTK output
   physics_params::physics_params = physics_params(g=9.81,ν=1.0e-6,h₀⬆=0.63,h₀⬇=0.03,Cd=0.0127) # Physical parameters
   ode_solver_params::ODE_solver_params = ODE_solver_params() # ODE solver parameters
+  ϵ::Float64 = 0.1 # Transition width for the initial condition
 end
 
 """
@@ -43,9 +44,8 @@ function main(params::DamBreak_building_params)
   u₀(t::Real) = x->u₀(x,t)
 
   # Define initial conditions
-  @unpack x₀, physics_params = params
+  @unpack x₀, ϵ, physics_params = params
   @unpack h₀⬆, h₀⬇ = physics_params
-  ϵ = 0.1
   h₀(x) = (0.5 * (1 + tanh((x₀-x[1]) / ϵ)))*(h₀⬆-h₀⬇)
   # h₀(x) = x[1] < x₀ ? (h₀⬆-h₀⬇) : 0.0
 
@@ -119,9 +119,8 @@ function main(ranks,params::DamBreak_building_params)
   u₀(t::Real) = x->u₀(x,t)
 
   # Define initial conditions
-  @unpack x₀, physics_params = params
+  @unpack x₀, ϵ, physics_params = params
   @unpack h₀⬆, h₀⬇ = physics_params
-  ϵ = 0.1
   h₀(x) = (0.5 * (1 + tanh((x₀-x[1]) / ϵ)))*(h₀⬆-h₀⬇)
 
   # Define spaces

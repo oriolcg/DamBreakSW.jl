@@ -13,6 +13,7 @@ include(srcdir("DamBreakSW.jl"))
 params_fine_2D = DamBreakSW.DamBreak_building_params(
   mesh_file=datadir("meshes","DamBreak_building_0.0_fine.msh"),
   x₀=0.0,
+  ϵ=0.2,
   order=2,
   verbose=true,
   vtk_output=true,
