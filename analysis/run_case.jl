@@ -17,9 +17,9 @@ params_fine_2D = DamBreakSW.DamBreak_building_params(
   verbose=true,
   vtk_output=true,
   Δtout=0.02,
-  vtk_folder="DamBreak_building_0.0_fine_ASGS",
-  formulation=:ASGS,
-  ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0,Δt=0.05,T=1.0)
+  vtk_folder="DamBreak_building_0.0_fine_Smagorinsky",
+  formulation=:Smagorinsky,
+  ode_solver_params=DamBreakSW.ODE_solver_params(:Generalized_α;ρ∞=0.0,Δt=0.02,T=0.4)
   # ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3)
 )
 DamBreakSW.main_parallel(np,params_fine_2D)
