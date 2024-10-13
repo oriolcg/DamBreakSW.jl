@@ -143,9 +143,24 @@ function main(ranks,params::DamBreak_building_params)
   op = get_FEOperator(forms,X,Y,Val(formulation))
 
   # Solver
+  function mykspsetup(ksp)
+    pc       = Ref{GridapPETSc.PETSC.PC}()
+    mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
+    @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
+    @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
+    @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
+    @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
+    @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
+    @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 2)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  14, 500000)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
+    @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
+  end
   # ls = LUSolver()
-  # nls = NLSolver(ls,show_trace=verbose,iterations=10,method=:newton)
-  nls = PETScNonlinearSolver()
+  ls = PETScLinearSolver(mykspsetup)
+  nls = NLSolver(ls,show_trace=verbose,iterations=7,method=:newton)
+  # nls = PETScNonlinearSolver()
   odes = get_ode_solver(nls,params.ode_solver_params)
 
   # Initial solution
