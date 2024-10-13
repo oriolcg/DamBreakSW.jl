@@ -155,8 +155,8 @@ function get_forms(measures,normals,D,::Val{:ASGS},
   c₁ = 12.0; c₂ = 2.0; c₃ = 1.0
   Rₕ(u,h,hₜ,∇u,∇h) = hₜ + u⋅∇h + (h+h₀⬇)*(tr(∇u))
   Rᵤ(u,h,uₜ,∇u,∇h) = uₜ + u⋅∇u + g*∇h + Cd/(h+h₀⬇)*(absᵤ(u))*u
-  Lᵤᵃ(u,∇v,∇w) = - u⋅∇v #- g*∇w
-  Lₕᵃ(u,h,∇v,∇w) = - u⋅∇w - (h₀⬇)*(tr(∇v))#(h+h₀⬇)*(tr(∇v))
+  Lᵤᵃ(u,∇v,∇w) = - u⋅∇v - g*∇w
+  Lₕᵃ(u,h,∇v,∇w) = - u⋅∇w - (h+h₀⬇)*(tr(∇v))
   τᵤinv(a,h,Δx₀) = 2/Δt + (c₁*ν / (Δx₀*Δx₀)) + (c₂*absᵤ(a) / Δx₀) + (c₃*Cd*g*absᵤ(a) / (h+1.0e-8))
   τᵤ(a,h,Δx₀) = 1.0 / τᵤinv(a,h,Δx₀)
   # τᵤ₂ = Δt/2
@@ -193,8 +193,8 @@ function get_forms(measures,normals,D,::Val{:ASGS},
                        ∫( (drag∘(u,h,v)) )dΩ +
                        ∫( (grad∘(∇(h),v)) )dΩ +
                        ∫( (convₕ∘(u,h,∇(u),∇(h),w)) )dΩ -
-                       ∫( (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ #-
-                      #  ∫( (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ
+                       ∫( (stabᵤ(u,h,∂t(u),∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ -
+                       ∫( (stabₕ(u,h,∂t(h),∇(u),∇(h),∇(v),∇(w),Δx₀)) )dΩ
   # jac(t,(u,h),(du,dh),(v,w)) =
   #                      ∫( (convᵤ(du,∇(u),v))  )dΩ +
   #                      ∫( (convᵤ(u,∇(du),v)) )dΩ +
