@@ -2,7 +2,7 @@
 #
 #SBATCH --job-name="DamBreakSW"
 #SBATCH --partition=rome
-#SBATCH --time=20:59:00
+#SBATCH --time=23:59:00
 #SBATCH -n 1
 #SBATCH -o stdout-benchmark/slurm-%j-%4t-%n.out
 #SBATCH -e stdout-benchmark/slurm-%j-%4t-%n.err
