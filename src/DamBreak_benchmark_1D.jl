@@ -38,6 +38,11 @@ function main(params::DamBreak_benchmark_1D_params)
   model = CartesianDiscreteModel((0,L), (nₓ,))
   Ω = Interior(model)
   Γ = Boundary(model)
+  Λ = Skeleton(model)
+
+  labels = get_face_labeling(model)
+  add_tag_from_tags!(labels,"outlet",[2])
+  Γout = Boundary(model,tags="outlet")
 
   # Define boundary conditions
   u₀(x,t) = VectorValue(0.0)
@@ -55,10 +60,12 @@ function main(params::DamBreak_benchmark_1D_params)
   # Integration Measure
   dΩ = Measure(Ω,2*order)
   dΓ = Measure(Γ,2*order)
-  measures = (dΩ,dΓ)
+  dΛ = Measure(Λ,2*order)
+  dΓout = Measure(Γout,2*order)
+  measures = (dΩ,dΓ,dΛ,dΓout)
 
   # Normals
-  normals = (get_normal_vector(Γ),)
+  normals = (get_normal_vector(Γ),get_normal_vector(Λ),get_normal_vector(Γout))
 
   # Weak form
   @unpack ode_solver_params = params
