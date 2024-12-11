@@ -101,92 +101,92 @@ end
 
 
 
-"""
-    main(ranks,params::DamBreak_building_params)
+# """
+#     main(ranks,params::DamBreak_building_params)
 
-Main function to run the 2D dambreak problem with an obstacle.
-"""
-function main(ranks,params::DamBreak_building_params)
+# Main function to run the 2D dambreak problem with an obstacle.
+# """
+# function main(ranks,params::DamBreak_building_params)
 
-  # Define the domain and Triangulations
-  @unpack mesh_file, verbose = params
-  model = GmshDiscreteModel(ranks,mesh_file)
-  Ω = Interior(model)
-  Γ = Boundary(model,tags=["walls"])
+#   # Define the domain and Triangulations
+#   @unpack mesh_file, verbose = params
+#   model = GmshDiscreteModel(ranks,mesh_file)
+#   Ω = Interior(model)
+#   Γ = Boundary(model,tags=["walls"])
 
-  # Define boundary conditions
-  u₀(x,t) = VectorValue(0.0,0.0)
-  u₀(t::Real) = x->u₀(x,t)
+#   # Define boundary conditions
+#   u₀(x,t) = VectorValue(0.0,0.0)
+#   u₀(t::Real) = x->u₀(x,t)
 
-  # Define initial conditions
-  @unpack x₀, ϵ, physics_params = params
-  @unpack h₀⬆, h₀⬇ = physics_params
-  h₀(x) = (0.5 * (1 + tanh((x₀-x[1]) / ϵ)))*(h₀⬆-h₀⬇)
+#   # Define initial conditions
+#   @unpack x₀, ϵ, physics_params = params
+#   @unpack h₀⬆, h₀⬇ = physics_params
+#   h₀(x) = (0.5 * (1 + tanh((x₀-x[1]) / ϵ)))*(h₀⬆-h₀⬇)
 
-  # Define spaces
-  @unpack order, formulation = params
-  D = 2
-  X,Y = get_FESpaces(Ω,D,order,["walls","inlet","sides"],[(true,true),(true,false),(false,true)],[u₀,u₀,u₀],Val(formulation))
+#   # Define spaces
+#   @unpack order, formulation = params
+#   D = 2
+#   X,Y = get_FESpaces(Ω,D,order,["walls","inlet","sides"],[(true,true),(true,false),(false,true)],[u₀,u₀,u₀],Val(formulation))
 
-  # Integration Measure
-  dΩ = Measure(Ω,2*order)
-  dΓ = Measure(Γ,2*order)
-  measures = (dΩ,dΓ)
+#   # Integration Measure
+#   dΩ = Measure(Ω,2*order)
+#   dΓ = Measure(Γ,2*order)
+#   measures = (dΩ,dΓ)
 
-  # Normals
-  nΓ = get_normal_vector(Γ)
-  normals = (nΓ,)
+#   # Normals
+#   nΓ = get_normal_vector(Γ)
+#   normals = (nΓ,)
 
-  # Weak form
-  @unpack ode_solver_params = params
-  forms = get_forms(measures,normals,D,Val(formulation), physics_params, ode_solver_params)
-  op = get_FEOperator(forms,X,Y,Val(formulation))
+#   # Weak form
+#   @unpack ode_solver_params = params
+#   forms = get_forms(measures,normals,D,Val(formulation), physics_params, ode_solver_params)
+#   op = get_FEOperator(forms,X,Y,Val(formulation))
 
-  # Solver
-  function mykspsetup(ksp)
-    pc       = Ref{GridapPETSc.PETSC.PC}()
-    mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
-    @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
-    @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-    @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
-    @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
-    @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
-    @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 2)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  14, 500000)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
-    @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
-  end
-  # ls = LUSolver()
-  ls = PETScLinearSolver(mykspsetup)
-  nls = NLSolver(ls,show_trace=verbose,iterations=7,method=:newton)
-  # nls = PETScNonlinearSolver()
-  odes = get_ode_solver(nls,params.ode_solver_params)
+#   # Solver
+#   function mykspsetup(ksp)
+#     pc       = Ref{GridapPETSc.PETSC.PC}()
+#     mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
+#     @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
+#     @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
+#     @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
+#     @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
+#     @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
+#     @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
+#     @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 2)
+#     @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  14, 500000)
+#     @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-6)
+#     @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
+#   end
+#   # ls = LUSolver()
+#   ls = PETScLinearSolver(mykspsetup)
+#   nls = NLSolver(ls,show_trace=verbose,iterations=7,method=:newton)
+#   # nls = PETScNonlinearSolver()
+#   odes = get_ode_solver(nls,params.ode_solver_params)
 
-  # Initial solution
-  xₕ₀, xdotₕ₀ = _get_initial_solution_DB_building(u₀,h₀,h₀⬇,X,Val(formulation))
-  @unpack vtk_output, vtk_folder, Δtout = params
-  vtk_output && _writevtk_DB_building(Ω,vtk_folder,xₕ₀,Val(formulation))
+#   # Initial solution
+#   xₕ₀, xdotₕ₀ = _get_initial_solution_DB_building(u₀,h₀,h₀⬇,X,Val(formulation))
+#   @unpack vtk_output, vtk_folder, Δtout = params
+#   vtk_output && _writevtk_DB_building(Ω,vtk_folder,xₕ₀,Val(formulation))
 
-  # Solution
-  xₕₜ = get_solution(odes,op,xₕ₀,xdotₕ₀,params.ode_solver_params)
+#   # Solution
+#   xₕₜ = get_solution(odes,op,xₕ₀,xdotₕ₀,params.ode_solver_params)
 
-  # Iterate over time
-  @unpack T = params.ode_solver_params
-  tout = 0.0
-  createpvd(ranks,datadir("sims",vtk_folder,"sol_DB2D")) do pvd
-    for (t,xₕ) in xₕₜ
-      println("Time: $t / $T")
-      if t >= tout
-        vtk_output && (pvd[t] = _createvtk_DB_building(Ω,vtk_folder,order,xₕ,t,Val(formulation)))
-        tout += Δtout
-      end
-    end
-  end
+#   # Iterate over time
+#   @unpack T = params.ode_solver_params
+#   tout = 0.0
+#   createpvd(ranks,datadir("sims",vtk_folder,"sol_DB2D")) do pvd
+#     for (t,xₕ) in xₕₜ
+#       println("Time: $t / $T")
+#       if t >= tout
+#         vtk_output && (pvd[t] = _createvtk_DB_building(Ω,vtk_folder,order,xₕ,t,Val(formulation)))
+#         tout += Δtout
+#       end
+#     end
+#   end
 
-  return nothing
+#   return nothing
 
-end
+# end
 
 
 # Auxiliary functions

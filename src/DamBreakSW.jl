@@ -6,7 +6,7 @@ using DrWatson
 using Gridap
 using GridapGmsh: gmsh, GmshDiscreteModel
 using GridapDistributed
-using GridapPETSc
+# using GridapPETSc
 using PartitionedArrays
 using Parameters
 
