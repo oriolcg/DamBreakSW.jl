@@ -72,7 +72,7 @@ params_1D_Smagorinsky_EXRK = DamBreakSW.DamBreak_benchmark_1D_params(
   ode_solver_params=DamBreakSW.ODE_solver_params(:EXRK_SSP_3_3;T=60.0,Δt=0.2)
 )
 # @timeit to "DamBreak_benchmark_1D" DamBreakSW.main(params_1D)
-@timeit to "DamBreak_benchmark_1D_ASGS" DamBreakSW.main(params_1D_ASGS)
+# @timeit to "DamBreak_benchmark_1D_ASGS" DamBreakSW.main(params_1D_ASGS)
 # @timeit to "DamBreak_benchmark_1D_Smagorinsky" DamBreakSW.main(params_1D_Smagorinsky)
 # @timeit to "DamBreak_benchmark_1D_Smagorinsky_EXRK" DamBreakSW.main(params_1D_Smagorinsky_EXRK)
 
